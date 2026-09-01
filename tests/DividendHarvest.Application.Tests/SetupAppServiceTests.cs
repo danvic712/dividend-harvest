@@ -23,6 +23,21 @@ public sealed class SetupAppServiceTests
     }
 
     [Fact]
+    public async Task GetStatus_returns_no_missing_requirements_after_initialization()
+    {
+        var repository = new Mock<ISetupRepository>();
+        repository
+            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var service = CreateService(repository);
+
+        var result = await service.GetStatusAsync(CancellationToken.None);
+
+        Assert.True(result.IsComplete);
+        Assert.Empty(result.MissingRequirements);
+    }
+
+    [Fact]
     public async Task InitializeAsync_saves_multiple_stocks_and_optional_initial_holding_atomically()
     {
         var repository = new Mock<ISetupRepository>();

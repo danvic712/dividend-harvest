@@ -134,6 +134,11 @@ dist
 *.user
 *.suo
 
+# Local SQLite data
+*.db
+*.db-shm
+*.db-wal
+
 # yarn v3
 .pnp.*
 .yarn/*
