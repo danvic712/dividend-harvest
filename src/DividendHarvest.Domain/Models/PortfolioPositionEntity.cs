@@ -1,4 +1,4 @@
-namespace DividendHarvest.Infrastructure.DataAccess.Entities;
+namespace DividendHarvest.Domain.Models;
 
 public sealed class PortfolioPositionEntity
 {

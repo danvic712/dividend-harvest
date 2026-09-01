@@ -1,6 +1,9 @@
 using System.Text.Json;
-using DividendHarvest.Application.Ports;
+using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Domain.Securities;
+using DividendHarvest.Infrastructure.Contracts;
 using Microsoft.Extensions.Options;
 
 namespace DividendHarvest.Infrastructure.FtShare;

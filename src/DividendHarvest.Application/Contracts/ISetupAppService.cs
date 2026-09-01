@@ -1,4 +1,6 @@
-namespace DividendHarvest.Application.Setup;
+using DividendHarvest.Application.Dto;
+
+namespace DividendHarvest.Application.Contracts;
 
 public interface ISetupAppService
 {

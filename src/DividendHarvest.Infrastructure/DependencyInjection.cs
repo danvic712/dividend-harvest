@@ -1,4 +1,6 @@
-using DividendHarvest.Application.Ports;
+using DividendHarvest.Application.Contracts;
+using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Infrastructure.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,8 +18,7 @@ public static class DependencyInjection
 
         services.AddDbContext<DataAccess.DividendHarvestDbContext>(options =>
             options.UseSqlite(connectionString));
-        services.AddScoped<ISetupRepository, DataAccess.EfSetupRepository>();
-        services.AddScoped<IUnitOfWork, DataAccess.EfUnitOfWork>();
+        services.AddScoped<IUow, DataAccess.EFUow>();
 
         return services;
     }
@@ -29,7 +30,7 @@ public static class DependencyInjection
         services
             .AddOptions<FtShare.FtShareOptions>()
             .Bind(configuration.GetSection(FtShare.FtShareOptions.SectionName));
-        services.AddScoped<FtShare.IFtShareMcpToolInvoker, FtShare.FtShareMcpToolInvoker>();
+        services.AddScoped<IFtShareMcpToolInvoker, FtShare.FtShareMcpToolInvoker>();
         services.AddScoped<IStockDataProvider, FtShare.FtShareStockDataProvider>();
 
         return services;

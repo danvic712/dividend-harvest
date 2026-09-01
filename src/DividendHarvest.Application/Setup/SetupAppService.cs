@@ -1,17 +1,24 @@
-using DividendHarvest.Application.Ports;
+using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
+using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Setup;
 
 public sealed class SetupAppService(
-    ISetupRepository repository,
-    IStockDataProvider stockDataProvider,
-    IUnitOfWork unitOfWork) : ISetupAppService
+    IUow uow,
+    IStockDataProvider stockDataProvider) : ISetupAppService
 {
     public async Task<SetupStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var isComplete = await repository.IsSetupCompletedAsync(cancellationToken);
+        var isComplete = await uow.Get<PortfolioEntity>()
+            .GetQueryable(asNoTracking: true)
+            .AnyAsync(cancellationToken);
+
         return isComplete
             ? new SetupStatus(true, [])
             : new SetupStatus(false, ["portfolio", "stocks"]);
@@ -23,7 +30,9 @@ public sealed class SetupAppService(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (await repository.IsSetupCompletedAsync(cancellationToken))
+        if (await uow.Get<PortfolioEntity>()
+            .GetQueryable(asNoTracking: true)
+            .AnyAsync(cancellationToken))
         {
             throw new SetupAlreadyCompletedException();
         }
@@ -92,38 +101,49 @@ public sealed class SetupAppService(
                 initialHolding));
         }
 
-        await unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
-        {
-            await repository.AddPortfolioAsync(
-                new PortfolioRecord(portfolioId, portfolioName),
-                transactionCancellationToken);
+        var portfolioRepository = uow.Get<PortfolioEntity>();
+        var securityRepository = uow.Get<SecurityEntity>();
+        var positionRepository = uow.Get<PortfolioPositionEntity>();
 
-            foreach (var stock in resolvedStocks)
+        await portfolioRepository.AddAsync(
+            new PortfolioEntity
             {
-                await repository.AddSecurityAsync(
-                    new SecurityRecord(
-                        stock.SecurityId,
-                        stock.Reference.SecurityCode,
-                        stock.Reference.ExchangeCode,
-                        stock.Data.SecurityName,
-                        stock.Data.MarketCode,
-                        stock.Data.CurrencyCode),
-                    transactionCancellationToken);
+                Id = portfolioId,
+                Name = portfolioName
+            },
+            cancellationToken);
 
-                if (stock.InitialHolding is not null)
+        foreach (var stock in resolvedStocks)
+        {
+            await securityRepository.AddAsync(
+                new SecurityEntity
                 {
-                    await repository.AddPositionAsync(
-                        new PositionRecord(
-                            portfolioId,
-                            stock.SecurityId,
-                            stock.InitialHolding.HeldShares,
-                            stock.InitialHolding.CoreShares,
-                            stock.InitialHolding.TargetShares,
-                            stock.InitialHolding.AverageCostPerShare),
-                        transactionCancellationToken);
-                }
+                    Id = stock.SecurityId,
+                    SecurityCode = stock.Reference.SecurityCode,
+                    ExchangeCode = stock.Reference.ExchangeCode,
+                    SecurityName = stock.Data.SecurityName,
+                    MarketCode = stock.Data.MarketCode,
+                    CurrencyCode = stock.Data.CurrencyCode
+                },
+                cancellationToken);
+
+            if (stock.InitialHolding is not null)
+            {
+                await positionRepository.AddAsync(
+                    new PortfolioPositionEntity
+                    {
+                        PortfolioId = portfolioId,
+                        SecurityId = stock.SecurityId,
+                        HeldShares = stock.InitialHolding.HeldShares,
+                        CoreShares = stock.InitialHolding.CoreShares,
+                        TargetShares = stock.InitialHolding.TargetShares,
+                        AverageCostPerShare = stock.InitialHolding.AverageCostPerShare
+                    },
+                    cancellationToken);
             }
-        }, cancellationToken);
+        }
+
+        await uow.CommitAsync(cancellationToken);
 
         return new SetupResult(
             portfolioId,

@@ -1,5 +1,11 @@
-using DividendHarvest.Application.Ports;
+using System.Linq.Expressions;
+using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Setup;
+using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Models;
+using DividendHarvest.Domain.Securities;
 using Moq;
 using Xunit;
 
@@ -10,10 +16,7 @@ public sealed class SetupAppServiceTests
     [Fact]
     public async Task GetStatus_returns_missing_requirements_before_initialization()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var repository = CreatePortfolioRepository(hasPortfolio: false);
         var service = CreateService(repository);
 
         var result = await service.GetStatusAsync(CancellationToken.None);
@@ -25,10 +28,7 @@ public sealed class SetupAppServiceTests
     [Fact]
     public async Task GetStatus_returns_no_missing_requirements_after_initialization()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        var repository = CreatePortfolioRepository(hasPortfolio: true);
         var service = CreateService(repository);
 
         var result = await service.GetStatusAsync(CancellationToken.None);
@@ -40,22 +40,18 @@ public sealed class SetupAppServiceTests
     [Fact]
     public async Task InitializeAsync_saves_multiple_stocks_and_optional_initial_holding_atomically()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var repository = CreatePortfolioRepository(hasPortfolio: false);
         var provider = new Mock<IStockDataProvider>();
         provider
-            .Setup(x => x.GetAsync(It.Is<DividendHarvest.Domain.Securities.AShareReference>(r => r.SecurityCode == "000001"), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(It.Is<AShareReference>(r => r.SecurityCode == "000001"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StockData("000001", "SZSE", "平安银行", "A-share", "CNY"));
         provider
-            .Setup(x => x.GetAsync(It.Is<DividendHarvest.Domain.Securities.AShareReference>(r => r.SecurityCode == "600036"), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(It.Is<AShareReference>(r => r.SecurityCode == "600036"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StockData("600036", "SSE", "招商银行", "A-share", "CNY"));
-        var unitOfWork = new Mock<IUnitOfWork>();
-        unitOfWork
-            .Setup(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()))
-            .Returns((Func<CancellationToken, Task> operation, CancellationToken cancellationToken) => operation(cancellationToken));
-        var service = new SetupAppService(repository.Object, provider.Object, unitOfWork.Object);
+        var securityRepository = new Mock<IRepository<SecurityEntity>>();
+        var positionRepository = new Mock<IRepository<PortfolioPositionEntity>>();
+        var unitOfWork = CreateUnitOfWork(repository, securityRepository, positionRepository);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object);
         var request = new SetupRequest(
             "长期股息组合",
             [
@@ -68,19 +64,20 @@ public sealed class SetupAppServiceTests
         Assert.Equal("长期股息组合", result.PortfolioName);
         Assert.Equal(2, result.Stocks.Count);
         Assert.Equal("平安银行", result.Stocks[0].SecurityName);
-        repository.Verify(x => x.AddPortfolioAsync(It.Is<PortfolioRecord>(p => p.Name == "长期股息组合"), It.IsAny<CancellationToken>()), Times.Once);
-        repository.Verify(x => x.AddSecurityAsync(It.IsAny<SecurityRecord>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
-        repository.Verify(x => x.AddPositionAsync(It.Is<PositionRecord>(p => p.HeldShares == 100 && p.CoreShares == 60), It.IsAny<CancellationToken>()), Times.Once);
-        unitOfWork.Verify(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(x => x.AddAsync(
+            It.Is<PortfolioEntity>(portfolio => portfolio.Name == "长期股息组合"),
+            It.IsAny<CancellationToken>()), Times.Once);
+        securityRepository.Verify(x => x.AddAsync(It.IsAny<SecurityEntity>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        positionRepository.Verify(x => x.AddAsync(
+            It.Is<PortfolioPositionEntity>(position => position.HeldShares == 100 && position.CoreShares == 60),
+            It.IsAny<CancellationToken>()), Times.Once);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task InitializeAsync_rejects_duplicate_stocks_before_fetching_data()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var repository = CreatePortfolioRepository(hasPortfolio: false);
         var provider = new Mock<IStockDataProvider>();
         var service = CreateService(repository, provider);
         var request = new SetupRequest(
@@ -92,83 +89,113 @@ public sealed class SetupAppServiceTests
 
         await Assert.ThrowsAsync<SetupValidationException>(() => service.InitializeAsync(request, CancellationToken.None));
 
-        provider.Verify(x => x.GetAsync(It.IsAny<DividendHarvest.Domain.Securities.AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task InitializeAsync_does_not_write_when_setup_is_already_complete()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        var repository = CreatePortfolioRepository(hasPortfolio: true);
         var provider = new Mock<IStockDataProvider>();
-        var unitOfWork = new Mock<IUnitOfWork>();
-        var service = new SetupAppService(repository.Object, provider.Object, unitOfWork.Object);
+        var unitOfWork = CreateUnitOfWork(repository);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object);
 
         await Assert.ThrowsAsync<SetupAlreadyCompletedException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
-        provider.Verify(x => x.GetAsync(It.IsAny<DividendHarvest.Domain.Securities.AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
-        unitOfWork.Verify(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
+        provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task InitializeAsync_does_not_write_when_stock_data_is_unavailable()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var repository = CreatePortfolioRepository(hasPortfolio: false);
         var provider = new Mock<IStockDataProvider>();
         provider
-            .Setup(x => x.GetAsync(It.IsAny<DividendHarvest.Domain.Securities.AShareReference>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StockData?)null);
-        var unitOfWork = new Mock<IUnitOfWork>();
-        var service = new SetupAppService(repository.Object, provider.Object, unitOfWork.Object);
+        var unitOfWork = CreateUnitOfWork(repository);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object);
 
         await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
-        unitOfWork.Verify(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddPortfolioAsync(It.IsAny<PortfolioRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task InitializeAsync_translates_provider_failure_without_writing()
     {
-        var repository = new Mock<ISetupRepository>();
-        repository
-            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+        var repository = CreatePortfolioRepository(hasPortfolio: false);
         var provider = new Mock<IStockDataProvider>();
         provider
-            .Setup(x => x.GetAsync(It.IsAny<DividendHarvest.Domain.Securities.AShareReference>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new StockDataProviderUnavailableException(
                 "FTShare MCP 股票资料暂时不可用。",
                 new TimeoutException("FTShare MCP 请求超时。")));
-        var unitOfWork = new Mock<IUnitOfWork>();
-        var service = new SetupAppService(repository.Object, provider.Object, unitOfWork.Object);
+        var unitOfWork = CreateUnitOfWork(repository);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object);
 
         var exception = await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
         Assert.IsType<StockDataProviderUnavailableException>(exception.InnerException);
-        unitOfWork.Verify(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddPortfolioAsync(It.IsAny<PortfolioRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static SetupAppService CreateService(
-        Mock<ISetupRepository> repository,
+        Mock<IRepository<PortfolioEntity>> repository,
         Mock<IStockDataProvider>? provider = null)
     {
-        var unitOfWork = new Mock<IUnitOfWork>();
+        var unitOfWork = CreateUnitOfWork(repository);
+        return new SetupAppService(unitOfWork.Object, (provider ?? new Mock<IStockDataProvider>()).Object);
+    }
+
+    private static Mock<IRepository<PortfolioEntity>> CreatePortfolioRepository(bool hasPortfolio)
+    {
+        var repository = new Mock<IRepository<PortfolioEntity>>();
+        repository
+            .Setup(x => x.GetQueryable(
+                It.IsAny<bool>(),
+                It.IsAny<Expression<Func<PortfolioEntity, object>>[]>()))
+            .Returns(new[]
+            {
+                hasPortfolio
+                    ? new PortfolioEntity { Id = Guid.NewGuid(), Name = "长期股息组合" }
+                    : null
+            }
+            .Where(entity => entity is not null)
+            .Cast<PortfolioEntity>()
+            .AsAsyncQueryable());
+        return repository;
+    }
+
+    private static Mock<IUow> CreateUnitOfWork(
+        Mock<IRepository<PortfolioEntity>> portfolioRepository,
+        Mock<IRepository<SecurityEntity>>? securityRepository = null,
+        Mock<IRepository<PortfolioPositionEntity>>? positionRepository = null)
+    {
+        securityRepository ??= new Mock<IRepository<SecurityEntity>>();
+        positionRepository ??= new Mock<IRepository<PortfolioPositionEntity>>();
+        var unitOfWork = new Mock<IUow>();
         unitOfWork
-            .Setup(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()))
-            .Returns((Func<CancellationToken, Task> operation, CancellationToken cancellationToken) => operation(cancellationToken));
-        return new SetupAppService(repository.Object, (provider ?? new Mock<IStockDataProvider>()).Object, unitOfWork.Object);
+            .Setup(x => x.Get<PortfolioEntity>())
+            .Returns(portfolioRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<SecurityEntity>())
+            .Returns(securityRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<PortfolioPositionEntity>())
+            .Returns(positionRepository.Object);
+        unitOfWork
+            .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(3);
+        return unitOfWork;
     }
 }

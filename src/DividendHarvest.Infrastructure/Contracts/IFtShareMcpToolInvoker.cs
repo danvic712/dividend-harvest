@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DividendHarvest.Infrastructure.FtShare;
+namespace DividendHarvest.Infrastructure.Contracts;
 
 public interface IFtShareMcpToolInvoker
 {

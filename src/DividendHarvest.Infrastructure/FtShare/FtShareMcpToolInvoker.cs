@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DividendHarvest.Infrastructure.Contracts;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
