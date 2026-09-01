@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/DividendHarvest.Domain/DividendHarvest.Domain.csproj" />
+  <Project Path="src/DividendHarvest.Application/DividendHarvest.Application.csproj" />
+  <Project Path="tests/DividendHarvest.Domain.Tests/DividendHarvest.Domain.Tests.csproj" />
+  <Project Path="tests/DividendHarvest.Application.Tests/DividendHarvest.Application.Tests.csproj" />
+</Solution>

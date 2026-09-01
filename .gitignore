@@ -128,6 +128,12 @@ dist
 # pnpm
 .pnpm-store
 
+# .NET build output
+**/bin/
+**/obj/
+*.user
+*.suo
+
 # yarn v3
 .pnp.*
 .yarn/*
