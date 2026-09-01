@@ -21,4 +21,17 @@ public static class DependencyInjection
 
         return services;
     }
+
+    public static IServiceCollection AddFtShareStockDataProvider(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services
+            .AddOptions<FtShare.FtShareOptions>()
+            .Bind(configuration.GetSection(FtShare.FtShareOptions.SectionName));
+        services.AddScoped<FtShare.IFtShareMcpToolInvoker, FtShare.FtShareMcpToolInvoker>();
+        services.AddScoped<IStockDataProvider, FtShare.FtShareStockDataProvider>();
+
+        return services;
+    }
 }

@@ -136,6 +136,31 @@ public sealed class SetupAppServiceTests
         repository.Verify(x => x.AddPortfolioAsync(It.IsAny<PortfolioRecord>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task InitializeAsync_translates_provider_failure_without_writing()
+    {
+        var repository = new Mock<ISetupRepository>();
+        repository
+            .Setup(x => x.IsSetupCompletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var provider = new Mock<IStockDataProvider>();
+        provider
+            .Setup(x => x.GetAsync(It.IsAny<DividendHarvest.Domain.Securities.AShareReference>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new StockDataProviderUnavailableException(
+                "FTShare MCP 股票资料暂时不可用。",
+                new TimeoutException("FTShare MCP 请求超时。")));
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var service = new SetupAppService(repository.Object, provider.Object, unitOfWork.Object);
+
+        var exception = await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
+            new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
+            CancellationToken.None));
+
+        Assert.IsType<StockDataProviderUnavailableException>(exception.InnerException);
+        unitOfWork.Verify(x => x.ExecuteInTransactionAsync(It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddPortfolioAsync(It.IsAny<PortfolioRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static SetupAppService CreateService(
         Mock<ISetupRepository> repository,
         Mock<IStockDataProvider>? provider = null)

@@ -65,8 +65,20 @@ public sealed class SetupAppService(
         {
             var stock = request.Stocks[index];
             var reference = references[index];
-            var stockData = await stockDataProvider.GetAsync(reference, cancellationToken)
-                ?? throw new StockDataUnavailableException(reference.SecurityCode);
+            StockData? stockData;
+            try
+            {
+                stockData = await stockDataProvider.GetAsync(reference, cancellationToken);
+            }
+            catch (StockDataProviderUnavailableException exception)
+            {
+                throw new StockDataUnavailableException(reference.SecurityCode, exception);
+            }
+
+            if (stockData is null)
+            {
+                throw new StockDataUnavailableException(reference.SecurityCode);
+            }
 
             ValidateStockData(reference, stockData);
             var initialHolding = stock.InitialHolding is null
