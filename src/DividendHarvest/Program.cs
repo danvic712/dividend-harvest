@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Analysis;
 using DividendHarvest.Application.Budget;
+using DividendHarvest.Application.DailySync;
 using DividendHarvest.Application.Dividends;
 using DividendHarvest.Application.Financials;
 using DividendHarvest.Application.Setup;
@@ -8,6 +9,8 @@ using DividendHarvest.Application.Validators;
 using DividendHarvest.Application.ModelParameters;
 using DividendHarvest.Application.PriceObservations;
 using DividendHarvest.Application.Recommendations;
+using DividendHarvest.Background;
+using DividendHarvest.Configuration;
 using DividendHarvest.Application.Watchlist;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.ExceptionHandling;
@@ -42,6 +45,12 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IRecommendationSnapshotAppService,
     RecommendationSnapshotAppService>();
+builder.Services.AddScoped<
+    IStockDailyDataSyncAppService,
+    StockDailyDataSyncAppService>();
+builder.Services.Configure<DailySyncOptions>(
+    builder.Configuration.GetSection(DailySyncOptions.SectionName));
+builder.Services.AddHostedService<DailyStockDataSyncHostedService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services
     .AddHealthChecks()

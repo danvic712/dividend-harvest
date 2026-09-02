@@ -81,6 +81,7 @@ src/
 │   ├── Financials/                     # 财务事实同步
 │   ├── Budget/                         # 组合现金流水与预算摘要
 │   ├── Recommendations/                # 多股票预算分配与建议
+│   ├── DailySync/                      # 交易日数据同步编排
 │   └── Analysis/                      # 当前股票分析结果
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
@@ -99,6 +100,8 @@ src/
     │   ├── StocksController.cs
     │   ├── BudgetsController.cs
     │   └── RecommendationsController.cs
+    ├── Background/                     # ASP.NET Core 后台调度
+    │   └── DailyStockDataSyncHostedService.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
@@ -297,15 +300,21 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 `GET /api/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
 
-分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序、集中度竞争和建议快照仍需组合级用例统一处理。
+分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序和集中度竞争由组合建议用例统一处理，建议快照由独立用例保存。
 
 ### 8.9 多股票组合建议
 
 `GET /api/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的分析结果、有效模型参数和组合预算，在组合层统一分配本期可用资金。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
 
-组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。当前 `Security` 模型尚未保存行业字段，因此行业集中度限制暂不计算；建议接口会保留后续接入行业字段和建议快照的边界。
+组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。当前 `Security` 模型尚未保存行业字段，因此行业集中度限制暂不计算；后续只需在股票资料模型和分配规则中补充行业维度。
 
 `POST /api/recommendations/snapshots` 使用同一份组合建议生成唯一 `model_run_id`，在一个 UoW 提交中保存每只股票的 `RecommendationSnapshot`。快照保留原始数据日期、参数版本、状态、价格区域和建议数量，不覆盖行情、股息、财务或现金流水事实，便于复现和后续回放。
+
+### 8.10 交易日数据同步
+
+`IStockDailyDataSyncAppService` 按关注列表逐只编排行情、股息和财务快照同步；失败项记录股票、数据类型和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。`POST /api/stocks/sync` 提供手动触发入口。
+
+Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailySync:TimeZoneId` 调度，默认使用上海时间每日 18:00，并跳过周末；A 股法定节假日由数据源实际返回结果决定，重复快照通过事实同步用例幂等处理。生产环境可以通过 `DailySync:Enabled=false` 关闭后台调度而保留手动接口。
 
 ## 9. FTShare MCP Adapter
 
