@@ -31,6 +31,9 @@ public sealed class SecurityConfiguration : IEntityTypeConfiguration<Security>
             .HasColumnName("currency_code")
             .HasMaxLength(3)
             .IsRequired();
+        builder.Property(x => x.SectorCode)
+            .HasColumnName("sector_code")
+            .HasMaxLength(100);
         builder.HasIndex(x => new { x.ExchangeCode, x.SecurityCode }).IsUnique();
     }
 }

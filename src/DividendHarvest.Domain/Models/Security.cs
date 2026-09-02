@@ -13,4 +13,6 @@ public sealed class Security
     public string MarketCode { get; set; } = string.Empty;
 
     public string CurrencyCode { get; set; } = string.Empty;
+
+    public string? SectorCode { get; set; }
 }

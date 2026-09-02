@@ -6,4 +6,5 @@ public sealed record StockWatchlistItem(
     string SecurityName,
     string MarketCode,
     string CurrencyCode,
-    StockHoldingSnapshot? Holding);
+    StockHoldingSnapshot? Holding,
+    string? SectorCode = null);

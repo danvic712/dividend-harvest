@@ -46,7 +46,7 @@ src/
 │   ├── Models/                         # 数据库实体模型
 │   │   ├── Portfolio.cs
 │   │   ├── PortfolioPosition.cs
-│   │   ├── Security.cs
+│   │   ├── Security.cs                    # 可选 sector_code
 │   │   ├── ModelParameterSet.cs
 │   │   ├── PriceObservation.cs
 │   │   ├── DividendEvent.cs
@@ -306,7 +306,7 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 `GET /api/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的分析结果、有效模型参数和组合预算，在组合层统一分配本期可用资金。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
 
-组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。当前 `Security` 模型尚未保存行业字段，因此行业集中度限制暂不计算；后续只需在股票资料模型和分配规则中补充行业维度。
+组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、行业/单股/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。`Security.SectorCode` 来自 FTShare 股票资料的可选 `sector_code`/`industry_code` 字段；缺失行业资料时跳过行业上限，不推断或伪造行业归属。
 
 `POST /api/recommendations/snapshots` 使用同一份组合建议生成唯一 `model_run_id`，在一个 UoW 提交中保存每只股票的 `RecommendationSnapshot`。快照保留原始数据日期、参数版本、状态、价格区域和建议数量，不覆盖行情、股息、财务或现金流水事实，便于复现和后续回放。
 

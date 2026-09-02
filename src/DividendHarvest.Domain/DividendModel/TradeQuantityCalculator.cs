@@ -15,7 +15,8 @@ public static class TradeQuantityCalculator
         int targetShares,
         decimal availableBudgetAmount,
         decimal? totalPortfolioValue,
-        decimal currentSecurityMarketValue)
+        decimal currentSecurityMarketValue,
+        decimal? currentSectorMarketValue = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
 
@@ -90,7 +91,8 @@ public static class TradeQuantityCalculator
                 heldShares,
                 availableBudgetAmount,
                 totalPortfolioValue,
-                currentSecurityMarketValue),
+                currentSecurityMarketValue,
+                currentSectorMarketValue),
             "partial_trim" or "aggressive_trim" => CalculateSell(
                 parameters,
                 priceZoneCode,
@@ -109,7 +111,8 @@ public static class TradeQuantityCalculator
         int heldShares,
         decimal availableBudgetAmount,
         decimal? totalPortfolioValue,
-        decimal currentSecurityMarketValue)
+        decimal currentSecurityMarketValue,
+        decimal? currentSectorMarketValue)
     {
         var budgetRatio = priceZoneCode == "strong_buy"
             ? parameters.StrongBuyBudgetRatio
@@ -139,6 +142,14 @@ public static class TradeQuantityCalculator
                     - currentSecurityMarketValue,
                 0m);
             maximumBudget = Math.Min(maximumBudget, securityRoom);
+
+            if (currentSectorMarketValue is { } sectorValue)
+            {
+                var sectorRoom = Math.Max(
+                    portfolioValue * parameters.MaxSectorWeight - sectorValue,
+                    0m);
+                maximumBudget = Math.Min(maximumBudget, sectorRoom);
+            }
         }
 
         var shares = FloorToTradingLot(

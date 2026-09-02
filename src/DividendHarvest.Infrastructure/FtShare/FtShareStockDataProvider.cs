@@ -179,6 +179,12 @@ public sealed class FtShareStockDataProvider(
         var securityName = ReadString(profile.Value, "security_name", "stock_name", "company_name", "name");
         var marketCode = NormalizeMarketCode(ReadString(profile.Value, "market_code", "market", "market_type"));
         var currencyCode = NormalizeCurrencyCode(ReadString(profile.Value, "currency_code", "currency"));
+        var sectorCode = ReadString(
+            profile.Value,
+            "sector_code",
+            "industry_code",
+            "sector",
+            "industry")?.Trim();
 
         if (securityName is null || marketCode is null || currencyCode is null)
         {
@@ -190,7 +196,8 @@ public sealed class FtShareStockDataProvider(
             reference.ExchangeCode,
             securityName,
             marketCode,
-            currencyCode);
+            currencyCode,
+            sectorCode);
     }
 
     private static JsonElement? SelectPayload(JsonElement value)

@@ -119,7 +119,8 @@ public sealed class SetupAppService(
                     ExchangeCode = stock.Reference.ExchangeCode,
                     SecurityName = stock.Data.SecurityName,
                     MarketCode = stock.Data.MarketCode,
-                    CurrencyCode = stock.Data.CurrencyCode
+                    CurrencyCode = stock.Data.CurrencyCode,
+                    SectorCode = stock.Data.SectorCode
                 },
                 cancellationToken);
 

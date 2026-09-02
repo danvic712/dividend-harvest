@@ -5,4 +5,5 @@ public sealed record StockData(
     string ExchangeCode,
     string SecurityName,
     string MarketCode,
-    string CurrencyCode);
+    string CurrencyCode,
+    string? SectorCode = null);

@@ -34,7 +34,8 @@ public sealed class StockWatchlistAppService(IUow uow) : IStockWatchlistAppServi
                         position.CoreShares,
                         position.TargetShares,
                         position.AverageCostPerShare)
-                    : null))
+                    : null,
+                security.SectorCode))
             .ToArray();
     }
 }

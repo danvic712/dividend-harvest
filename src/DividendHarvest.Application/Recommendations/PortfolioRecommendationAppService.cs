@@ -42,6 +42,15 @@ public sealed class PortfolioRecommendationAppService(
         var totalPortfolioValue = analyses
             .Where(analysis => analysis.ClosePrice is not null)
             .Sum(analysis => analysis.HeldShares * analysis.ClosePrice!.Value);
+        var sectorMarketValues = Enumerable.Range(0, analyses.Count)
+            .Where(index => !string.IsNullOrWhiteSpace(watchlist[index].SectorCode))
+            .GroupBy(index => watchlist[index].SectorCode!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(index =>
+                    analyses[index].HeldShares
+                    * (analyses[index].ClosePrice ?? 0m)),
+                StringComparer.OrdinalIgnoreCase);
         var cashReserveRatio = parameters.Count == 0
             ? 0m
             : parameters.Max(parameter => parameter.CashReserveRatio);
@@ -83,7 +92,11 @@ public sealed class PortfolioRecommendationAppService(
                 watchlist[index].Holding?.TargetShares ?? 0,
                 remainingBudget,
                 totalPortfolioValue > 0 ? totalPortfolioValue : null,
-                analysis.HeldShares * closePrice);
+                analysis.HeldShares * closePrice,
+                watchlist[index].SectorCode is { } sectorCode
+                    && sectorMarketValues.TryGetValue(sectorCode, out var sectorMarketValue)
+                    ? sectorMarketValue
+                    : null);
             var adjustedAnalysis = analysis with
             {
                 SuggestedBuyShares = trade.SuggestedBuyShares,

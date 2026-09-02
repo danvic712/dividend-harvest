@@ -167,7 +167,8 @@ public sealed class StockAnalysisAppService(
             totalPortfolioValue > 0 ? totalPortfolioValue : null,
             position is null
                 ? 0m
-                : position.HeldShares * priceObservation.ClosePrice);
+                : position.HeldShares * priceObservation.ClosePrice,
+            null);
         var explanation = reliabilityCode == "passed"
             ? "股息可靠性检查通过，当前价格区域可用于生成后续预算建议。"
             : "TTM 股息率和价格区域已计算，但股息可靠性资料尚未完整，当前只提供谨慎参考。";
