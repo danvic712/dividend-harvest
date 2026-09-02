@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Setup;
 using DividendHarvest.Application.Validators;
+using DividendHarvest.Application.Watchlist;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.ExceptionHandling;
 using DividendHarvest.Infrastructure;
@@ -15,6 +16,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApplicationExceptionHandler>();
 builder.Services.AddControllers();
 builder.Services.AddValidatorsFromAssemblyContaining<SetupRequestValidator>();
+builder.Services.AddScoped<IStockWatchlistAppService, StockWatchlistAppService>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])

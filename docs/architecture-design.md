@@ -53,11 +53,13 @@ src/
 ├── DividendHarvest.Application/
 │   ├── Contracts/                      # Application 对外 Interface
 │   │   ├── ISetupAppService.cs
-│   │   └── IStockDataProvider.cs
+│   │   ├── IStockDataProvider.cs
+│   │   └── IStockWatchlistAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
-│   └── Setup/                          # AppService 实现和用例编排
+│   ├── Setup/                          # AppService 实现和用例编排
+│   └── Watchlist/                      # 股票关注列表查询
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -71,6 +73,8 @@ src/
     ├── appsettings.json                # 本地默认配置
     ├── appsettings.Production.json     # 生产环境配置
     ├── Controllers/                    # 业务 HTTP Controller
+    │   ├── SetupController.cs
+    │   └── StocksController.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
@@ -214,6 +218,10 @@ SetupAppService
 Controller 只负责 HTTP 绑定、调用 `I*AppService` 和返回响应，不包含业务计算、数据库访问、外部调用或手写输入判断。来自 HTTP、MCP 和定时任务的请求参数在 Application 边界通过 FluentValidation 验证；验证器位于 `Application/Validators/`，并通过 Application 程序集扫描注册。
 
 FluentValidation 负责请求形状、字段范围、跨字段关系和集合重复项；Domain 仍负责不可绕过的业务不变量。验证失败转换为统一的 400 ProblemDetails，已知 Application 异常由 Host 的统一异常处理器映射为稳定的 HTTP 响应，避免在每个 Controller 中复制异常分支。
+
+### 8.2 Watchlist 查询
+
+`GET /api/stocks` 通过 `IStockWatchlistAppService` 返回已配置的 A 股股票，按股票代码和交易所稳定排序；如果存在对应的 `PortfolioPosition`，响应同时包含当前持股、核心仓、目标股数和平均成本，否则 `holding` 为 `null`。Controller 不直接查询 `Security` 或 `PortfolioPosition`，股票资料和持仓摘要由 Application 用例统一组装。
 
 ## 9. FTShare MCP Adapter
 
