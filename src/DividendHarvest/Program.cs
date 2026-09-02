@@ -7,6 +7,7 @@ using DividendHarvest.Application.Setup;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Application.ModelParameters;
 using DividendHarvest.Application.PriceObservations;
+using DividendHarvest.Application.Recommendations;
 using DividendHarvest.Application.Watchlist;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.ExceptionHandling;
@@ -35,6 +36,9 @@ builder.Services.AddScoped<
     StockFinancialSnapshotAppService>();
 builder.Services.AddScoped<IStockAnalysisAppService, StockAnalysisAppService>();
 builder.Services.AddScoped<IBudgetAppService, BudgetAppService>();
+builder.Services.AddScoped<
+    IPortfolioRecommendationAppService,
+    PortfolioRecommendationAppService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services
     .AddHealthChecks()

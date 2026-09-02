@@ -66,7 +66,8 @@ src/
 │   │   ├── IStockDividendEventAppService.cs
 │   │   ├── IStockAnalysisAppService.cs
 │   │   ├── IStockFinancialSnapshotAppService.cs
-│   │   └── IBudgetAppService.cs
+│   │   ├── IBudgetAppService.cs
+│   │   └── IPortfolioRecommendationAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
@@ -77,6 +78,7 @@ src/
 │   ├── Dividends/                      # 股息事实同步
 │   ├── Financials/                     # 财务事实同步
 │   ├── Budget/                         # 组合现金流水与预算摘要
+│   ├── Recommendations/                # 多股票预算分配与建议
 │   └── Analysis/                      # 当前股票分析结果
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
@@ -93,7 +95,8 @@ src/
     ├── Controllers/                    # 业务 HTTP Controller
     │   ├── SetupController.cs
     │   ├── StocksController.cs
-    │   └── BudgetsController.cs
+    │   ├── BudgetsController.cs
+    │   └── RecommendationsController.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
@@ -282,13 +285,19 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 `POST /api/budgets/entries` 通过 `IBudgetAppService` 记录组合层的实际现金流水，支持预算入金、已收到股息、买入、卖出、费用和现金调整。股票相关流水必须关联已配置的 A 股；代码和流水类型/方向由 FluentValidation 与 Domain 规则共同校验。`GET /api/budgets/summary` 按组合汇总流入和流出，并计算 `max(total_inflow_amount - total_outflow_amount, 0)` 作为当前可用预算。
 
-现金流水是用户实际资金的来源；预计股息不会自动写入流水，也不会因为 TTM 股息存在而增加预算。当前功能为后续建议股数计算提供可追溯的预算输入，现金保留比例、再投资比例和多股票资金竞争将在建议计算用例中应用。
+现金流水是用户实际资金的来源；预计股息不会自动写入流水，也不会因为 TTM 股息存在而增加预算。该摘要为股票分析和组合建议提供可追溯的预算输入；现金保留比例在建议计算中应用，再投资比例和自动记录实际股息仍由后续现金流水录入流程负责。
 
 ### 8.8 当前股票分析
 
 `GET /api/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
 
 分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序、集中度竞争和建议快照仍需组合级用例统一处理。
+
+### 8.9 多股票组合建议
+
+`GET /api/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的分析结果、有效模型参数和组合预算，在组合层统一分配本期可用资金。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
+
+组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。当前 `Security` 模型尚未保存行业字段，因此行业集中度限制暂不计算；建议接口会保留后续接入行业字段和建议快照的边界。
 
 ## 9. FTShare MCP Adapter
 
