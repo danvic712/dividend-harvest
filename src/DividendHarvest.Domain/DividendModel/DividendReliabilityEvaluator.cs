@@ -59,6 +59,13 @@ public static class DividendReliabilityEvaluator
                 group => group.Key,
                 group => group.Sum(dividendEvent => dividendEvent.DividendPerShare));
 
+        if (completedYears
+            .Take(3)
+            .Any(year => !annualDividends.ContainsKey(year)))
+        {
+            return "failed";
+        }
+
         if (completedYears.Any(year => !annualDividends.ContainsKey(year)))
         {
             return "cautious";

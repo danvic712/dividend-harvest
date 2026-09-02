@@ -76,8 +76,8 @@ public sealed class StockAnalysisAppServiceTests
             CancellationToken.None);
 
         Assert.Equal("000001", result.SecurityCode);
-        Assert.Equal("cautious", result.ModelStatusCode);
-        Assert.Equal("cautious", result.DividendReliabilityCode);
+        Assert.Equal("failed", result.ModelStatusCode);
+        Assert.Equal("failed", result.DividendReliabilityCode);
         Assert.Equal(4m, result.ClosePrice);
         Assert.Equal(0.32m, result.ModelDividendPerShare);
         Assert.Equal("ttm", result.DividendModeCode);

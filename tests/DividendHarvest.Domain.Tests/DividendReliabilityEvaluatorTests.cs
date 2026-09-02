@@ -9,10 +9,13 @@ public sealed class DividendReliabilityEvaluatorTests
     [Fact]
     public void Evaluate_returns_cautious_when_five_year_dividend_history_is_incomplete()
     {
+        var securityId = Guid.NewGuid();
         var events = new[]
         {
-            CreateDividendEvent(Guid.NewGuid(), 0.20m, new DateOnly(2026, 6, 1), "current"),
-            CreateDividendEvent(Guid.NewGuid(), 0.20m, new DateOnly(2025, 6, 1), "previous")
+            CreateDividendEvent(securityId, 0.20m, new DateOnly(2026, 6, 1), "current"),
+            CreateDividendEvent(securityId, 0.20m, new DateOnly(2025, 6, 1), "previous"),
+            CreateDividendEvent(securityId, 0.20m, new DateOnly(2024, 6, 1), "year-2024"),
+            CreateDividendEvent(securityId, 0.20m, new DateOnly(2023, 6, 1), "year-2023")
         };
 
         var result = DividendReliabilityEvaluator.Evaluate(
@@ -54,6 +57,32 @@ public sealed class DividendReliabilityEvaluatorTests
             new DateOnly(2026, 9, 1));
 
         Assert.Equal("passed", result);
+    }
+
+    [Fact]
+    public void Evaluate_returns_failed_when_recent_three_year_history_is_incomplete()
+    {
+        var securityId = Guid.NewGuid();
+        var events = new[]
+        {
+            CreateDividendEvent(
+                securityId,
+                0.20m,
+                new DateOnly(2024, 6, 1),
+                "dividend-2024"),
+            CreateDividendEvent(
+                securityId,
+                0.20m,
+                new DateOnly(2023, 6, 1),
+                "dividend-2023")
+        };
+
+        var result = DividendReliabilityEvaluator.Evaluate(
+            events,
+            [],
+            new DateOnly(2026, 9, 1));
+
+        Assert.Equal("failed", result);
     }
 
     [Fact]
