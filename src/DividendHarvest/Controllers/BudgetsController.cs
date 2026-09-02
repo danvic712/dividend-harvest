@@ -1,11 +1,13 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DividendHarvest.Controllers;
 
 [ApiController]
-[Route("api/budgets")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/budgets")]
 public sealed class BudgetsController(IBudgetAppService budgetAppService)
     : ControllerBase
 {
@@ -23,6 +25,9 @@ public sealed class BudgetsController(IBudgetAppService budgetAppService)
         CancellationToken cancellationToken)
     {
         var result = await budgetAppService.RecordAsync(request, cancellationToken);
-        return Created($"/api/budgets/entries/{result.CashLedgerEntryId}", result);
+        return CreatedAtAction(
+            nameof(GetSummary),
+            new { version = "1" },
+            result);
     }
 }

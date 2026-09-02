@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -87,13 +88,19 @@ public sealed class StockFinancialSnapshotAppService(
 
             if (existingByDate.TryGetValue(data.DataAsOfDate, out var existingSnapshot))
             {
-                results.Add(ToResult(existingSnapshot, reference));
+                results.Add(ApplicationMapper.ToStockFinancialSnapshotResult(
+                    existingSnapshot,
+                    reference.SecurityCode,
+                    reference.ExchangeCode));
                 continue;
             }
 
             var snapshot = CreateSnapshot(security.Id, data);
             newSnapshots.Add(snapshot);
-            results.Add(ToResult(snapshot, reference));
+            results.Add(ApplicationMapper.ToStockFinancialSnapshotResult(
+                snapshot,
+                reference.SecurityCode,
+                reference.ExchangeCode));
             existingByDate.Add(data.DataAsOfDate, snapshot);
         }
 
@@ -152,22 +159,4 @@ public sealed class StockFinancialSnapshotAppService(
         }
     }
 
-    private static StockFinancialSnapshotResult ToResult(
-        FinancialSnapshot snapshot,
-        AShareReference reference)
-        => new(
-            snapshot.Id,
-            reference.SecurityCode,
-            reference.ExchangeCode,
-            snapshot.DataAsOfDate,
-            snapshot.CapturedAt,
-            snapshot.PublishedAt,
-            snapshot.EarningsPerShare,
-            snapshot.DividendPayoutRatio,
-            snapshot.ThreeYearAverageDividendPayoutRatio,
-            snapshot.PriceToBookRatio,
-            snapshot.ReturnOnEquity,
-            snapshot.DataSource,
-            snapshot.SourceRecordId,
-            snapshot.DataQualityCode);
 }

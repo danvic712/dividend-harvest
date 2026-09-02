@@ -1,11 +1,13 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DividendHarvest.Controllers;
 
 [ApiController]
-[Route("api/portfolio")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/portfolio")]
 public sealed class PortfolioController(IPortfolioTradeAppService portfolioTradeAppService)
     : ControllerBase
 {

@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -147,10 +148,10 @@ public sealed class SetupAppService(
             portfolioId,
             portfolioName,
             resolvedStocks
-                .Select(stock => new SetupStockResult(
+                .Select(stock => ApplicationMapper.ToSetupStockResult(
+                    stock.Data,
                     stock.Reference.SecurityCode,
-                    stock.Reference.ExchangeCode,
-                    stock.Data.SecurityName))
+                    stock.Reference.ExchangeCode))
                 .ToArray());
     }
 

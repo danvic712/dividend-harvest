@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -71,14 +72,20 @@ public sealed class StockPriceObservationAppService(
                 cancellationToken);
         if (existingObservation is not null)
         {
-            return ToResult(existingObservation, reference);
+            return ApplicationMapper.ToStockPriceObservationResult(
+                existingObservation,
+                reference.SecurityCode,
+                reference.ExchangeCode);
         }
 
         var observation = CreateObservation(security.Id, marketData);
         await uow.Get<PriceObservation>().AddAsync(observation, cancellationToken);
         await uow.CommitAsync(cancellationToken);
 
-        return ToResult(observation, reference);
+        return ApplicationMapper.ToStockPriceObservationResult(
+            observation,
+            reference.SecurityCode,
+            reference.ExchangeCode);
     }
 
     private static bool MatchesReference(
@@ -120,17 +127,4 @@ public sealed class StockPriceObservationAppService(
         }
     }
 
-    private static StockPriceObservationResult ToResult(
-        PriceObservation observation,
-        AShareReference reference)
-        => new(
-            observation.Id,
-            reference.SecurityCode,
-            reference.ExchangeCode,
-            observation.TradingDate,
-            observation.ClosePrice,
-            observation.PriceObservedAt,
-            observation.DataSource,
-            observation.SourceRecordId,
-            observation.DataQualityCode);
 }

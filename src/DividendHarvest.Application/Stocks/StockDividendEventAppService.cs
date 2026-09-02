@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -90,13 +91,19 @@ public sealed class StockDividendEventAppService(
                     data.SourceRecordId,
                     out var existingEvent))
             {
-                results.Add(ToResult(existingEvent, reference));
+                results.Add(ApplicationMapper.ToStockDividendEventResult(
+                    existingEvent,
+                    reference.SecurityCode,
+                    reference.ExchangeCode));
                 continue;
             }
 
             var dividendEvent = CreateDividendEvent(security.Id, data);
             newEvents.Add(dividendEvent);
-            results.Add(ToResult(dividendEvent, reference));
+            results.Add(ApplicationMapper.ToStockDividendEventResult(
+                dividendEvent,
+                reference.SecurityCode,
+                reference.ExchangeCode));
             existingBySourceRecordId.Add(data.SourceRecordId, dividendEvent);
         }
 
@@ -156,23 +163,4 @@ public sealed class StockDividendEventAppService(
         }
     }
 
-    private static StockDividendEventResult ToResult(
-        DividendEvent dividendEvent,
-        AShareReference reference)
-        => new(
-            dividendEvent.Id,
-            reference.SecurityCode,
-            reference.ExchangeCode,
-            dividendEvent.DividendPerShare,
-            dividendEvent.DividendTypeCode,
-            dividendEvent.DividendStatusCode,
-            dividendEvent.AnnouncementDate,
-            dividendEvent.ExDividendDate,
-            dividendEvent.PaymentDate,
-            dividendEvent.IsSpecialDividend,
-            dividendEvent.PublishedAt,
-            dividendEvent.CapturedAt,
-            dividendEvent.DataSource,
-            dividendEvent.SourceRecordId,
-            dividendEvent.DataQualityCode);
 }

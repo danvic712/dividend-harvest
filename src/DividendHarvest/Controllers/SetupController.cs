@@ -1,11 +1,13 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DividendHarvest.Controllers;
 
 [ApiController]
-[Route("api/setup")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/setup")]
 public sealed class SetupController(ISetupAppService setupAppService) : ControllerBase
 {
     [HttpGet("status")]
@@ -21,6 +23,9 @@ public sealed class SetupController(ISetupAppService setupAppService) : Controll
         CancellationToken cancellationToken)
     {
         var result = await setupAppService.InitializeAsync(request, cancellationToken);
-        return Created("/api/setup/status", result);
+        return CreatedAtAction(
+            nameof(GetStatus),
+            new { version = "1" },
+            result);
     }
 }

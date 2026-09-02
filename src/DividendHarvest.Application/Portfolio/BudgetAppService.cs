@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -76,16 +77,10 @@ public sealed class BudgetAppService(
         await uow.Get<CashLedgerEntry>().AddAsync(entry, cancellationToken);
         await uow.CommitAsync(cancellationToken);
 
-        return new CashLedgerEntryResult(
-            entry.Id,
-            entry.PortfolioId,
-            entry.EntryDate,
-            entry.EntryTypeCode,
-            entry.CashDirectionCode,
-            entry.CashAmount,
+        return ApplicationMapper.ToCashLedgerEntryResult(
+            entry,
             reference?.SecurityCode,
-            reference?.ExchangeCode,
-            entry.SourceRecordId);
+            reference?.ExchangeCode);
     }
 
     public async Task<BudgetSummary> GetSummaryAsync(

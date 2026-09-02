@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -49,7 +50,10 @@ public sealed class StockModelParameterAppService(
 
         return parameters is null
             ? null
-            : ToDto(parameters, reference);
+            : ApplicationMapper.ToStockModelParameterSet(
+                parameters,
+                reference.SecurityCode,
+                reference.ExchangeCode);
     }
 
     public async Task<StockModelParameterSet> SaveAsync(
@@ -99,7 +103,10 @@ public sealed class StockModelParameterAppService(
         await parameterRepository.AddAsync(parameters, cancellationToken);
         await uow.CommitAsync(cancellationToken);
 
-        return ToDto(parameters, reference);
+        return ApplicationMapper.ToStockModelParameterSet(
+            parameters,
+            reference.SecurityCode,
+            reference.ExchangeCode);
     }
 
     private async Task<Security?> FindSecurityAsync(
@@ -148,29 +155,4 @@ public sealed class StockModelParameterAppService(
         }
     }
 
-    private static StockModelParameterSet ToDto(
-        ModelParameterSet parameters,
-        AShareReference reference)
-        => new(
-            parameters.Id,
-            reference.SecurityCode,
-            reference.ExchangeCode,
-            parameters.ModelVersion,
-            parameters.StrongBuyYieldThreshold,
-            parameters.AccumulationYieldThreshold,
-            parameters.PartialTrimYieldThreshold,
-            parameters.AggressiveTrimYieldThreshold,
-            parameters.StrongBuyBudgetRatio,
-            parameters.AccumulateBudgetRatio,
-            parameters.PartialTrimRatio,
-            parameters.AggressiveTrimRatio,
-            parameters.MaxSecurityWeight,
-            parameters.MaxSectorWeight,
-            parameters.CashReserveRatio,
-            parameters.MaxSingleTradeAmount,
-            parameters.MaxPeriodBudgetAmount,
-            parameters.TransactionFeeRatio,
-            parameters.MinimumTransactionFeeAmount,
-            parameters.TradingLotSize,
-            parameters.EffectiveFromDate);
 }

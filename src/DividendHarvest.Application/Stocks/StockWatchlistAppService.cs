@@ -1,5 +1,6 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
+using DividendHarvest.Application.Mapping;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using Microsoft.EntityFrameworkCore;
@@ -22,20 +23,11 @@ public sealed class StockWatchlistAppService(IUow uow) : IStockWatchlistAppServi
         var holdingsBySecurityId = positions.ToDictionary(position => position.SecurityId);
 
         return securities
-            .Select(security => new StockWatchlistItem(
-                security.SecurityCode,
-                security.ExchangeCode,
-                security.SecurityName,
-                security.MarketCode,
-                security.CurrencyCode,
+            .Select(security => ApplicationMapper.ToStockWatchlistItem(
+                security,
                 holdingsBySecurityId.TryGetValue(security.Id, out var position)
-                    ? new StockHoldingSnapshot(
-                        position.HeldShares,
-                        position.CoreShares,
-                        position.TargetShares,
-                        position.AverageCostPerShare)
-                    : null,
-                security.SectorCode))
+                    ? ApplicationMapper.ToStockHoldingSnapshot(position)
+                    : null))
             .ToArray();
     }
 }

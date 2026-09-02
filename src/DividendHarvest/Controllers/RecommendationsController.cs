@@ -1,11 +1,13 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DividendHarvest.Controllers;
 
 [ApiController]
-[Route("api/recommendations")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/recommendations")]
 public sealed class RecommendationsController(
     IPortfolioRecommendationAppService portfolioRecommendationAppService,
     IRecommendationSnapshotAppService recommendationSnapshotAppService)

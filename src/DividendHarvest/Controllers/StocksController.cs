@@ -1,11 +1,13 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DividendHarvest.Controllers;
 
 [ApiController]
-[Route("api/stocks")]
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/stocks")]
 public sealed class StocksController(
     IStockWatchlistAppService stockWatchlistAppService,
     IStockModelParameterAppService stockModelParameterAppService,
