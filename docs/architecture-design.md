@@ -50,7 +50,8 @@ src/
 │   │   ├── ModelParameterSet.cs
 │   │   ├── PriceObservation.cs
 │   │   ├── DividendEvent.cs
-│   │   └── FinancialSnapshot.cs
+│   │   ├── FinancialSnapshot.cs
+│   │   └── CashLedgerEntry.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   ├── Securities/                     # A 股标识领域规则
@@ -64,7 +65,8 @@ src/
 │   │   ├── IStockPriceObservationAppService.cs
 │   │   ├── IStockDividendEventAppService.cs
 │   │   ├── IStockAnalysisAppService.cs
-│   │   └── IStockFinancialSnapshotAppService.cs
+│   │   ├── IStockFinancialSnapshotAppService.cs
+│   │   └── IBudgetAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
@@ -74,6 +76,7 @@ src/
 │   ├── PriceObservations/              # 收盘行情快照同步
 │   ├── Dividends/                      # 股息事实同步
 │   ├── Financials/                     # 财务事实同步
+│   ├── Budget/                         # 组合现金流水与预算摘要
 │   └── Analysis/                      # 当前股票分析结果
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
@@ -89,7 +92,8 @@ src/
     ├── appsettings.Production.json     # 生产环境配置
     ├── Controllers/                    # 业务 HTTP Controller
     │   ├── SetupController.cs
-    │   └── StocksController.cs
+    │   ├── StocksController.cs
+    │   └── BudgetsController.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
@@ -195,6 +199,7 @@ SetupAppService
 - `Configurations/PriceObservationConfiguration.cs`
 - `Configurations/DividendEventConfiguration.cs`
 - `Configurations/FinancialSnapshotConfiguration.cs`
+- `Configurations/CashLedgerEntryConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -213,6 +218,8 @@ Portfolio 1 ───────────── * ModelParameterSet * ──
 Security 1 ───────────── * PriceObservation
 Security 1 ───────────── * DividendEvent
 Security 1 ───────────── * FinancialSnapshot
+Portfolio 1 ──────────── * CashLedgerEntry
+Security 0..1 ────────── * CashLedgerEntry
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -271,7 +278,13 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 财务数据缺失或外部服务不可用不会产生部分提交；支付率原始值保留在事实表中，由 Domain 可靠性规则判断是否通过或失败。
 
-### 8.7 当前股票分析
+### 8.7 组合现金流水与预算摘要
+
+`POST /api/budgets/entries` 通过 `IBudgetAppService` 记录组合层的实际现金流水，支持预算入金、已收到股息、买入、卖出、费用和现金调整。股票相关流水必须关联已配置的 A 股；代码和流水类型/方向由 FluentValidation 与 Domain 规则共同校验。`GET /api/budgets/summary` 按组合汇总流入和流出，并计算 `max(total_inflow_amount - total_outflow_amount, 0)` 作为当前可用预算。
+
+现金流水是用户实际资金的来源；预计股息不会自动写入流水，也不会因为 TTM 股息存在而增加预算。当前功能为后续建议股数计算提供可追溯的预算输入，现金保留比例、再投资比例和多股票资金竞争将在建议计算用例中应用。
+
+### 8.8 当前股票分析
 
 `GET /api/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
 

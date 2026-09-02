@@ -21,6 +21,8 @@ public sealed class ApplicationExceptionHandler(
                 (StatusCodes.Status400BadRequest, "股票同步请求无效"),
             StockAnalysisValidationException =>
                 (StatusCodes.Status400BadRequest, "股票分析请求无效"),
+            BudgetValidationException =>
+                (StatusCodes.Status400BadRequest, "预算流水请求无效"),
             SetupAlreadyCompletedException => (StatusCodes.Status409Conflict, "系统已经完成建账"),
             SetupNotCompletedException => (StatusCodes.Status409Conflict, "系统尚未完成建账"),
             ModelParameterVersionAlreadyExistsException =>

@@ -25,11 +25,11 @@ internal static class AShareValidationRules
             .WithMessage("交易所必须是 SSE、SZSE 或 BSE。");
     }
 
-    private static bool IsValidSecurityCode(string? value)
+    internal static bool IsValidSecurityCode(string? value)
         => value?.Trim().Length == 6
             && value.Trim().All(character => character is >= '0' and <= '9');
 
-    private static bool IsSupportedExchange(string? value)
+    internal static bool IsSupportedExchange(string? value)
         => value is not null
             && SupportedExchanges.Contains(value.Trim(), StringComparer.OrdinalIgnoreCase);
 }
