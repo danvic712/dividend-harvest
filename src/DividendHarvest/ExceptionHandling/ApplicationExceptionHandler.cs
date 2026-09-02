@@ -16,7 +16,12 @@ public sealed class ApplicationExceptionHandler(
         var mapping = exception switch
         {
             SetupValidationException => (StatusCodes.Status400BadRequest, "建账请求无效"),
+            ModelParameterValidationException => (StatusCodes.Status400BadRequest, "股票模型参数无效"),
             SetupAlreadyCompletedException => (StatusCodes.Status409Conflict, "系统已经完成建账"),
+            SetupNotCompletedException => (StatusCodes.Status409Conflict, "系统尚未完成建账"),
+            ModelParameterVersionAlreadyExistsException =>
+                (StatusCodes.Status409Conflict, "股票模型参数版本已存在"),
+            StockNotConfiguredException => (StatusCodes.Status404NotFound, "股票尚未配置"),
             StockDataUnavailableException => (StatusCodes.Status503ServiceUnavailable, "股票基础资料不可用"),
             _ => ((int StatusCode, string Title)?)null
         };

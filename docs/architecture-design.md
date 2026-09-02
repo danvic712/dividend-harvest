@@ -46,7 +46,8 @@ src/
 │   ├── Models/                         # 数据库实体模型
 │   │   ├── Portfolio.cs
 │   │   ├── PortfolioPosition.cs
-│   │   └── Security.cs
+│   │   ├── Security.cs
+│   │   └── ModelParameterSet.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   └── Securities/                     # A 股标识领域规则
@@ -54,12 +55,14 @@ src/
 │   ├── Contracts/                      # Application 对外 Interface
 │   │   ├── ISetupAppService.cs
 │   │   ├── IStockDataProvider.cs
-│   │   └── IStockWatchlistAppService.cs
+│   │   ├── IStockWatchlistAppService.cs
+│   │   └── IStockModelParameterAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
 │   ├── Setup/                          # AppService 实现和用例编排
-│   └── Watchlist/                      # 股票关注列表查询
+│   ├── Watchlist/                      # 股票关注列表查询
+│   └── ModelParameters/                # 股票模型参数版本管理
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -149,7 +152,8 @@ SetupAppService
       │
       ├── Get<Portfolio>() ─────────────┐
       ├── Get<Security>()               │
-      └── Get<PortfolioPosition>()      │
+      ├── Get<PortfolioPosition>()      │
+      └── Get<ModelParameterSet>()      │
                                        ▼
                               EFUow / EFRepository<TEntity>
                                        │
@@ -175,6 +179,7 @@ SetupAppService
 - `Configurations/PortfolioConfiguration.cs`
 - `Configurations/PortfolioPositionConfiguration.cs`
 - `Configurations/SecurityConfiguration.cs`
+- `Configurations/ModelParameterSetConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -189,6 +194,7 @@ modelBuilder.ApplyConfigurationsFromAssembly(
 
 ```text
 Portfolio 1 ───────────── * PortfolioPosition * ───────────── 1 Security
+Portfolio 1 ───────────── * ModelParameterSet * ───────────── 1 Security
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -222,6 +228,12 @@ FluentValidation 负责请求形状、字段范围、跨字段关系和集合重
 ### 8.2 Watchlist 查询
 
 `GET /api/stocks` 通过 `IStockWatchlistAppService` 返回已配置的 A 股股票，按股票代码和交易所稳定排序；如果存在对应的 `PortfolioPosition`，响应同时包含当前持股、核心仓、目标股数和平均成本，否则 `holding` 为 `null`。Controller 不直接查询 `Security` 或 `PortfolioPosition`，股票资料和持仓摘要由 Application 用例统一组装。
+
+### 8.3 股票模型参数
+
+`POST /api/stocks/model-parameters` 为已配置股票保存一个不可覆盖的模型参数版本；参数按 `portfolio_id + security_id + effective_from_date` 唯一。`GET /api/stocks/{securityCode}/{exchangeCode}/model-parameters` 返回当前日期已经生效的最新版本，未来版本不会提前使用。四个收益率阈值必须满足 `strong_buy > accumulation > partial_trim > aggressive_trim > 0`，预算、持仓上限、现金保留比例和交易费用参数均由 FluentValidation 与 Domain 规则共同约束。
+
+Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSet` 实体；重复生效日期返回 409，未配置股票返回 404，未完成首次建账返回 409。
 
 ## 9. FTShare MCP Adapter
 

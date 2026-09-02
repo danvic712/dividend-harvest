@@ -6,7 +6,9 @@ namespace DividendHarvest.Controllers;
 
 [ApiController]
 [Route("api/stocks")]
-public sealed class StocksController(IStockWatchlistAppService stockWatchlistAppService)
+public sealed class StocksController(
+    IStockWatchlistAppService stockWatchlistAppService,
+    IStockModelParameterAppService stockModelParameterAppService)
     : ControllerBase
 {
     [HttpGet]
@@ -15,5 +17,35 @@ public sealed class StocksController(IStockWatchlistAppService stockWatchlistApp
     {
         var stocks = await stockWatchlistAppService.GetAsync(cancellationToken);
         return Ok(stocks);
+    }
+
+    [HttpGet("{securityCode}/{exchangeCode}/model-parameters")]
+    public async Task<ActionResult<StockModelParameterSet>> GetModelParameters(
+        string securityCode,
+        string exchangeCode,
+        CancellationToken cancellationToken)
+    {
+        var parameters = await stockModelParameterAppService.GetAsync(
+            new GetStockModelParametersRequest(securityCode, exchangeCode),
+            cancellationToken);
+        return parameters is null ? NotFound() : Ok(parameters);
+    }
+
+    [HttpPost("model-parameters")]
+    public async Task<ActionResult<StockModelParameterSet>> SaveModelParameters(
+        [FromBody] SaveStockModelParametersRequest request,
+        CancellationToken cancellationToken)
+    {
+        var parameters = await stockModelParameterAppService.SaveAsync(
+            request,
+            cancellationToken);
+        return CreatedAtAction(
+            nameof(GetModelParameters),
+            new
+            {
+                securityCode = parameters.SecurityCode,
+                exchangeCode = parameters.ExchangeCode
+            },
+            parameters);
     }
 }

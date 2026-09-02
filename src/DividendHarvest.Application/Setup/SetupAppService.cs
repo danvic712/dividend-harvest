@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Portfolio;
@@ -36,10 +37,7 @@ public sealed class SetupAppService(
         if (!validationResult.IsValid)
         {
             throw new SetupValidationException(
-                string.Join(
-                    "；",
-                    validationResult.Errors.Select(error =>
-                        $"{error.PropertyName}: {error.ErrorMessage}")));
+                ValidationErrorFormatter.Format(validationResult));
         }
 
         if (await uow.Get<Portfolio>()

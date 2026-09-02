@@ -12,6 +12,8 @@ internal sealed class DividendHarvestDbContext(DbContextOptions<DividendHarvestD
 
     public DbSet<PortfolioPosition> PortfolioPositions => Set<PortfolioPosition>();
 
+    public DbSet<ModelParameterSet> ModelParameterSets => Set<ModelParameterSet>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DividendHarvestDbContext).Assembly);
