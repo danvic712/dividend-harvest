@@ -48,6 +48,16 @@ public sealed class ApplicationErrorCatalogTests
     }
 
     [Fact]
+    public void Resolve_returns_the_canonical_culture_name()
+    {
+        var localized = catalog.Resolve(
+            new SetupAlreadyCompletedException(),
+            "en-us");
+
+        Assert.Equal("en-US", localized.CultureName);
+    }
+
+    [Fact]
     public void Resolve_does_not_mix_chinese_validation_text_into_english_response()
     {
         var localized = catalog.Resolve(

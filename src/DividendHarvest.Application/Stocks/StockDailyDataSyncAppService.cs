@@ -89,15 +89,14 @@ public sealed class StockDailyDataSyncAppService(
         }
         catch (Exception exception) when (IsExpectedSyncFailure(exception))
         {
-            var detail = exception is ApplicationExceptionBase applicationException
-                ? applicationErrorCatalog.Resolve(applicationException).Detail
-                : exception.Message;
+            var applicationException = (ApplicationExceptionBase)exception;
+            var localizedError = applicationErrorCatalog.Resolve(applicationException);
             failures.Add(new StockDataSyncFailure(
                 stock.SecurityCode,
                 stock.ExchangeCode,
                 dataKind,
-                (exception as ApplicationExceptionBase)?.ErrorCode ?? "stock_data_sync_failed",
-                detail));
+                applicationException.ErrorCode,
+                localizedError.Detail));
         }
     }
 

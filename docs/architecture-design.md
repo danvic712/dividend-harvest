@@ -42,7 +42,7 @@ ASP.NET Core 默认环境名为 `Production`（大小写不敏感）时，会自
 
 根目录 `locales/` 是跨层共享的文本资源源文件，当前包含 `zh-CN` 和 `en-US` 两个语言目录；每个语言目录按业务领域拆分为 `common.json`、`setup.json`、`stocks.json`、`portfolio.json` 和 `dividend-strategy.json`。异常定义使用稳定的 `error_code` 作为 JSON 键，并支持由 Application 异常提供的命名参数插值。
 
-Application 项目通过 `EmbeddedResource` 将根目录 `locales/**/*.json` 编译嵌入 `DividendHarvest.Application.dll`。运行时只从程序集资源读取文本，不读取可被容器或请求任意替换的本地文件。Host 的统一异常处理器根据请求的 `Accept-Language` 选择语言，不支持或缺失时回退到 `zh-CN`，并在 ProblemDetails 扩展中返回实际使用的 `locale`。后台同步等非 HTTP 入口使用默认语言。
+Application 项目通过 `EmbeddedResource` 将根目录 `locales/**/*.json` 编译嵌入 `DividendHarvest.Application.dll`。运行时只从程序集资源读取文本，不读取可被容器或请求任意替换的本地文件。Host 的统一异常处理器根据请求的 `Accept-Language` 及其 `q` 权重选择语言，返回 canonical culture name；不支持、质量为 0 或缺失时回退到 `zh-CN`，并在 ProblemDetails 扩展中返回实际使用的 `locale`。后台同步等非 HTTP 入口使用默认语言。
 
 根目录 JSON 是前端未来复用的共享源；前端不直接读取 Application DLL，而应通过构建时复制/导入同一组资源保持显示文本一致。
 
@@ -429,7 +429,7 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 - `StockDataProviderUnavailableException`：外部资料 Adapter 的连接、协议或配置失败，由 Setup 用例转换为 `StockDataUnavailableException`。
 - `CashLedgerEntryConflictException` 和 `PortfolioTradeConflictException`：同一组合的 `source_record_id` 已存在，但请求内容不一致。
 
-所有 Application 异常都携带稳定的 `error_code` 和供文本插值使用的结构化参数；异常类型不再保存用户可见的领域文案。`locales/{culture}/{domain}.json` 为每个错误码定义 HTTP 状态、标题和详情，Application 的 `IApplicationErrorCatalog` 负责加载嵌入式资源、校验各语言错误码集合并执行语言选择与参数插值。
+所有 Application 异常都携带稳定的 `error_code` 和供文本插值使用的结构化参数；异常类型不保存固定的用户界面文案，验证异常只保留统一验证器产生的结构化诊断。`locales/{culture}/{domain}.json` 为每个错误码定义 HTTP 状态、标题和详情，Application 的 `IApplicationErrorCatalog` 负责加载嵌入式资源、校验各语言错误码集合并执行语言选择与参数插值。
 
 Host 的 `ApplicationExceptionHandler` 只负责把错误目录解析出的结果写成 ProblemDetails：验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503，并通过扩展返回 `error_code` 和 `locale`。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；内部日志仍可通过结构化日志记录稳定错误码和状态。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 

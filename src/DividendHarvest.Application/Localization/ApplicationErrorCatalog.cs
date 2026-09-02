@@ -74,9 +74,14 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
                     continue;
                 }
 
-                if (definitions.ContainsKey(languageName))
+                var exactCulture = definitions.Keys.FirstOrDefault(
+                    cultureName => string.Equals(
+                        cultureName,
+                        languageName,
+                        StringComparison.OrdinalIgnoreCase));
+                if (exactCulture is not null)
                 {
-                    return languageName;
+                    return exactCulture;
                 }
 
                 var neutralLanguage = languageName.Split('-', 2)[0];
@@ -182,9 +187,10 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
             using var stream = assembly.GetManifestResourceStream(resourceName)
                 ?? throw new InvalidOperationException(
                     $"Embedded application locale resource '{resourceName}' could not be opened.");
-            var domainDefinitions = JsonSerializer.Deserialize<Dictionary<string, ApplicationErrorDefinition>>(
-                stream,
-                JsonOptions)
+            using var document = JsonDocument.Parse(stream);
+            EnsureNoDuplicateProperties(document.RootElement, resourceName);
+            var domainDefinitions = document.RootElement.Deserialize<
+                Dictionary<string, ApplicationErrorDefinition>>(JsonOptions)
                 ?? throw new InvalidOperationException(
                     $"Embedded application locale resource '{resourceName}' is empty.");
 
@@ -328,5 +334,32 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
         }
 
         return placeholders;
+    }
+
+    private static void EnsureNoDuplicateProperties(
+        JsonElement element,
+        string resourceName)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var propertyNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                if (!propertyNames.Add(property.Name))
+                {
+                    throw new InvalidOperationException(
+                        $"Embedded application locale resource '{resourceName}' contains duplicate property '{property.Name}'.");
+                }
+
+                EnsureNoDuplicateProperties(property.Value, resourceName);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                EnsureNoDuplicateProperties(item, resourceName);
+            }
+        }
     }
 }
