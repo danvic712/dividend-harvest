@@ -62,6 +62,10 @@ public sealed class StockAnalysisAppService(
             .GetQueryable(asNoTracking: true)
             .Where(dividendEvent => dividendEvent.SecurityId == security.Id)
             .ToListAsync(cancellationToken);
+        var financialSnapshots = await uow.Get<FinancialSnapshot>()
+            .GetQueryable(asNoTracking: true)
+            .Where(snapshot => snapshot.SecurityId == security.Id)
+            .ToListAsync(cancellationToken);
         var position = await uow.Get<PortfolioPosition>()
             .GetQueryable(asNoTracking: true)
             .FirstOrDefaultAsync(
@@ -78,7 +82,10 @@ public sealed class StockAnalysisAppService(
                 priceObservation.TradingDate);
         var reliabilityCode = modelDividendPerShare is null
             ? "unavailable"
-            : "cautious";
+            : DividendReliabilityEvaluator.Evaluate(
+                dividendEvents,
+                financialSnapshots,
+                priceObservation!.TradingDate);
         var computedAt = timeProvider.GetUtcNow();
 
         if (parameters is null
@@ -101,12 +108,25 @@ public sealed class StockAnalysisAppService(
             parameters,
             modelDividendPerShare.Value,
             priceObservation.ClosePrice);
+        var modelStatusCode = reliabilityCode switch
+        {
+            "passed" => "available",
+            "failed" => "failed",
+            "re_evaluate" => "re_evaluate",
+            _ => "cautious"
+        };
+        var recommendationCode = reliabilityCode == "passed"
+            ? priceZone.PriceZoneCode
+            : "no_action";
+        var explanation = reliabilityCode == "passed"
+            ? "股息可靠性检查通过，当前价格区域可用于生成后续预算建议。"
+            : "TTM 股息率和价格区域已计算，但股息可靠性资料尚未完整，当前只提供谨慎参考。";
 
         return new StockAnalysisResult(
             reference.SecurityCode,
             reference.ExchangeCode,
             security.SecurityName,
-            "cautious",
+            modelStatusCode,
             reliabilityCode,
             priceObservation.ClosePrice,
             modelDividendPerShare,
@@ -117,7 +137,7 @@ public sealed class StockAnalysisAppService(
             priceZone.PartialTrimPrice,
             priceZone.AggressiveTrimPrice,
             priceZone.PriceZoneCode,
-            priceZone.PriceZoneCode == "hold" ? "hold" : "no_action",
+            recommendationCode,
             heldShares,
             coreShares,
             satelliteShares,
@@ -127,7 +147,7 @@ public sealed class StockAnalysisAppService(
             priceObservation.TradingDate,
             parameters.Id,
             computedAt,
-            "TTM 股息率和价格区域已计算，但股息可靠性资料尚未完整，当前只提供谨慎参考。");
+            explanation);
     }
 
     private static StockAnalysisResult CreateUnavailableResult(

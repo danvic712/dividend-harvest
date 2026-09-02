@@ -67,6 +67,7 @@ public sealed class StockAnalysisAppServiceTests
                     new DateOnly(2025, 8, 1),
                     "outside-window")
             ]),
+            CreateRepository<FinancialSnapshot>([]),
             CreateRepository([position]));
         var service = CreateService(unitOfWork.Object);
 
@@ -114,6 +115,7 @@ public sealed class StockAnalysisAppServiceTests
             CreateRepository([parameters]),
             CreateRepository([priceObservation]),
             CreateRepository<DividendEvent>([]),
+            CreateRepository<FinancialSnapshot>([]),
             CreateRepository<PortfolioPosition>([]));
         var service = CreateService(unitOfWork.Object);
 
@@ -128,6 +130,73 @@ public sealed class StockAnalysisAppServiceTests
         Assert.Equal("no_action", result.RecommendationCode);
         Assert.Equal(0, result.SuggestedBuyShares);
         Assert.Equal(0, result.SuggestedSellShares);
+    }
+
+    [Fact]
+    public async Task GetAsync_exposes_recommendation_when_dividend_reliability_passes()
+    {
+        var security = CreateSecurity();
+        var portfolio = new Portfolio
+        {
+            Id = Guid.NewGuid(),
+            Name = "长期股息组合"
+        };
+        var parameters = CreateParameters(portfolio.Id, security.Id);
+        var priceObservation = PriceObservation.Create(
+            security.Id,
+            new DateOnly(2026, 9, 1),
+            4m,
+            new DateTimeOffset(2026, 9, 1, 7, 0, 0, TimeSpan.Zero),
+            "FTShare",
+            "price-passed",
+            "valid");
+        var dividendEvents = Enumerable.Range(2021, 5)
+            .Select(year => CreateDividendEvent(
+                security.Id,
+                0.20m,
+                new DateOnly(year, 6, 1),
+                $"dividend-{year}"))
+            .Append(CreateDividendEvent(
+                security.Id,
+                0.20m,
+                new DateOnly(2026, 6, 1),
+                "dividend-2026"))
+            .Append(CreateDividendEvent(
+                security.Id,
+                0.20m,
+                new DateOnly(2025, 10, 1),
+                "dividend-2025-ttm"))
+            .ToArray();
+        var financialSnapshot = FinancialSnapshot.Create(
+            security.Id,
+            new DateOnly(2025, 12, 31),
+            new DateTimeOffset(2026, 1, 10, 8, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 1, 9, 8, 0, 0, TimeSpan.Zero),
+            0.80m,
+            0.45m,
+            0.40m,
+            0.90m,
+            0.12m,
+            "FTShare",
+            "financial-2025",
+            "valid");
+        var unitOfWork = CreateUnitOfWork(
+            CreateRepository([security]),
+            CreateRepository([parameters]),
+            CreateRepository([priceObservation]),
+            CreateRepository(dividendEvents),
+            CreateRepository([financialSnapshot]),
+            CreateRepository<PortfolioPosition>([]));
+        var service = CreateService(unitOfWork.Object);
+
+        var result = await service.GetAsync(
+            new GetStockAnalysisRequest("000001", "SZSE"),
+            CancellationToken.None);
+
+        Assert.Equal("available", result.ModelStatusCode);
+        Assert.Equal("passed", result.DividendReliabilityCode);
+        Assert.Equal("strong_buy", result.PriceZoneCode);
+        Assert.Equal("strong_buy", result.RecommendationCode);
     }
 
     [Fact]
@@ -225,6 +294,7 @@ public sealed class StockAnalysisAppServiceTests
         Mock<IRepository<ModelParameterSet>> parameterRepository,
         Mock<IRepository<PriceObservation>> priceRepository,
         Mock<IRepository<DividendEvent>> dividendRepository,
+        Mock<IRepository<FinancialSnapshot>> financialRepository,
         Mock<IRepository<PortfolioPosition>> positionRepository)
     {
         var unitOfWork = new Mock<IUow>();
@@ -238,6 +308,9 @@ public sealed class StockAnalysisAppServiceTests
         unitOfWork
             .Setup(x => x.Get<DividendEvent>())
             .Returns(dividendRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<FinancialSnapshot>())
+            .Returns(financialRepository.Object);
         unitOfWork
             .Setup(x => x.Get<PortfolioPosition>())
             .Returns(positionRepository.Object);
