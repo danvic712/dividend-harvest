@@ -1,4 +1,5 @@
 using DividendHarvest.Domain.Models;
+using DividendHarvest.Domain.Codes;
 
 namespace DividendHarvest.Domain.DividendModel;
 
@@ -36,14 +37,14 @@ public static class DividendPriceZoneCalculator
         var aggressiveTrimPrice =
             modelDividendPerShare / parameters.AggressiveTrimYieldThreshold;
         var priceZoneCode = closePrice <= strongBuyPrice
-            ? "strong_buy"
+            ? PriceZoneCodes.StrongBuy
             : closePrice <= accumulatePrice
-                ? "accumulate"
+                ? PriceZoneCodes.Accumulate
                 : closePrice < partialTrimPrice
-                    ? "hold"
+                    ? PriceZoneCodes.Hold
                     : closePrice < aggressiveTrimPrice
-                        ? "partial_trim"
-                        : "aggressive_trim";
+                        ? PriceZoneCodes.PartialTrim
+                        : PriceZoneCodes.AggressiveTrim;
 
         return new PriceZoneResult(
             strongBuyPrice,

@@ -1,3 +1,5 @@
+using DividendHarvest.Domain.Codes;
+
 namespace DividendHarvest.Domain.Models;
 
 public sealed class PriceObservation
@@ -64,9 +66,10 @@ public sealed class PriceObservation
             throw new ArgumentException("来源记录标识不能为空。", nameof(sourceRecordId));
         }
 
-        if (string.IsNullOrWhiteSpace(dataQualityCode))
+        var normalizedQualityCode = dataQualityCode?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!DataQualityCodes.IsSupported(normalizedQualityCode))
         {
-            throw new ArgumentException("数据质量代码不能为空。", nameof(dataQualityCode));
+            throw new ArgumentException("数据质量代码不受支持。", nameof(dataQualityCode));
         }
 
         return new PriceObservation
@@ -78,7 +81,7 @@ public sealed class PriceObservation
             PriceObservedAt = priceObservedAt.ToUniversalTime(),
             DataSource = dataSource.Trim(),
             SourceRecordId = sourceRecordId.Trim(),
-            DataQualityCode = dataQualityCode.Trim()
+            DataQualityCode = normalizedQualityCode
         };
     }
 }

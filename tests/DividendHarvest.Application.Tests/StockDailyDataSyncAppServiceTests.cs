@@ -92,8 +92,8 @@ public sealed class StockDailyDataSyncAppServiceTests
         var result = await service.SyncAsync(CancellationToken.None);
 
         Assert.Equal(2, result.AttemptedStockCount);
-        Assert.Equal(2, result.CompletedStockCount);
-        Assert.Equal(0, result.FailedStockCount);
+        Assert.Equal(2, result.FullyCompletedStockCount);
+        Assert.Equal(0, result.PartiallyFailedStockCount);
         Assert.Empty(result.Failures);
         prices.Verify(x => x.SyncAsync(
             It.IsAny<SyncStockPriceRequest>(),
@@ -141,10 +141,11 @@ public sealed class StockDailyDataSyncAppServiceTests
         var result = await service.SyncAsync(CancellationToken.None);
 
         Assert.Equal(1, result.AttemptedStockCount);
-        Assert.Equal(0, result.CompletedStockCount);
-        Assert.Equal(1, result.FailedStockCount);
+        Assert.Equal(0, result.FullyCompletedStockCount);
+        Assert.Equal(1, result.PartiallyFailedStockCount);
         var failure = Assert.Single(result.Failures);
         Assert.Equal("price", failure.DataKind);
+        Assert.Equal("stock_market_data_unavailable", failure.ErrorCode);
         dividends.Verify(x => x.SyncAsync(
             It.IsAny<SyncStockDividendsRequest>(),
             It.IsAny<CancellationToken>()), Times.Once);

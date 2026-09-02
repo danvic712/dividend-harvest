@@ -35,9 +35,15 @@ public sealed class RecommendationSnapshotConfiguration
             .HasColumnName("dividend_reliability_code")
             .HasMaxLength(32)
             .IsRequired();
+        builder.Property(x => x.ObservedPriceZoneCode)
+            .HasColumnName("observed_price_zone_code")
+            .HasMaxLength(32);
         builder.Property(x => x.PriceZoneCode)
             .HasColumnName("price_zone_code")
             .HasMaxLength(32);
+        builder.Property(x => x.PriceZoneConfirmed)
+            .HasColumnName("price_zone_confirmed")
+            .IsRequired();
         builder.Property(x => x.RecommendationCode)
             .HasColumnName("recommendation_code")
             .HasMaxLength(32)

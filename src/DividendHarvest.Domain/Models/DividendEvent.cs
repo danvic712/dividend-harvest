@@ -1,16 +1,9 @@
+using DividendHarvest.Domain.Codes;
+
 namespace DividendHarvest.Domain.Models;
 
 public sealed class DividendEvent
 {
-    private static readonly string[] SupportedDividendTypes =
-        ["regular_cash", "special_cash"];
-
-    private static readonly string[] SupportedDividendStatuses =
-        ["implemented", "proposed", "cancelled"];
-
-    private static readonly string[] SupportedDataQualityCodes =
-        ["valid", "cautious", "stale", "missing", "conflicted"];
-
     private DividendEvent()
     {
     }
@@ -72,7 +65,7 @@ public sealed class DividendEvent
         }
 
         var normalizedDividendType = dividendTypeCode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (!SupportedDividendTypes.Contains(normalizedDividendType, StringComparer.Ordinal))
+        if (!DividendTypeCodes.IsSupported(normalizedDividendType))
         {
             throw new ArgumentException(
                 "股息类型必须是 regular_cash 或 special_cash。",
@@ -80,7 +73,7 @@ public sealed class DividendEvent
         }
 
         var normalizedDividendStatus = dividendStatusCode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (!SupportedDividendStatuses.Contains(normalizedDividendStatus, StringComparer.Ordinal))
+        if (!DividendStatusCodes.IsSupported(normalizedDividendStatus))
         {
             throw new ArgumentException(
                 "股息状态必须是 implemented、proposed 或 cancelled。",
@@ -112,7 +105,7 @@ public sealed class DividendEvent
         }
 
         var normalizedQualityCode = dataQualityCode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (!SupportedDataQualityCodes.Contains(normalizedQualityCode, StringComparer.Ordinal))
+        if (!DataQualityCodes.IsSupported(normalizedQualityCode))
         {
             throw new ArgumentException(
                 "数据质量代码不受支持。",

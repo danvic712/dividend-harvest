@@ -1,4 +1,5 @@
 using DividendHarvest.Domain.Models;
+using DividendHarvest.Domain.Codes;
 
 namespace DividendHarvest.Domain.DividendModel;
 
@@ -76,16 +77,27 @@ public static class TradeQuantityCalculator
                 "单只股票当前市值不能为负数。");
         }
 
-        if (modelStatusCode != "available" || dividendReliabilityCode != "passed")
+        var normalizedModelStatusCode = NormalizeRequiredCode(modelStatusCode, ModelStatusCodes.IsSupported, nameof(modelStatusCode));
+        var normalizedReliabilityCode = NormalizeRequiredCode(
+            dividendReliabilityCode,
+            DividendReliabilityCodes.IsSupported,
+            nameof(dividendReliabilityCode));
+        var normalizedPriceZoneCode = NormalizeRequiredCode(
+            priceZoneCode,
+            PriceZoneCodes.IsSupported,
+            nameof(priceZoneCode));
+
+        if (normalizedModelStatusCode != ModelStatusCodes.Available
+            || normalizedReliabilityCode != DividendReliabilityCodes.Passed)
         {
             return EmptyResult();
         }
 
-        return priceZoneCode switch
+        return normalizedPriceZoneCode switch
         {
-            "strong_buy" or "accumulate" => CalculateBuy(
+            PriceZoneCodes.StrongBuy or PriceZoneCodes.Accumulate => CalculateBuy(
                 parameters,
-                priceZoneCode,
+                normalizedPriceZoneCode,
                 closePrice,
                 targetShares,
                 heldShares,
@@ -93,9 +105,9 @@ public static class TradeQuantityCalculator
                 totalPortfolioValue,
                 currentSecurityMarketValue,
                 currentSectorMarketValue),
-            "partial_trim" or "aggressive_trim" => CalculateSell(
+            PriceZoneCodes.PartialTrim or PriceZoneCodes.AggressiveTrim => CalculateSell(
                 parameters,
-                priceZoneCode,
+                normalizedPriceZoneCode,
                 closePrice,
                 heldShares,
                 coreShares),
@@ -114,7 +126,7 @@ public static class TradeQuantityCalculator
         decimal currentSecurityMarketValue,
         decimal? currentSectorMarketValue)
     {
-        var budgetRatio = priceZoneCode == "strong_buy"
+        var budgetRatio = priceZoneCode == PriceZoneCodes.StrongBuy
             ? parameters.StrongBuyBudgetRatio
             : parameters.AccumulateBudgetRatio;
         var maximumBudget = availableBudgetAmount * budgetRatio;
@@ -178,7 +190,7 @@ public static class TradeQuantityCalculator
         int coreShares)
     {
         var satelliteShares = Math.Max(heldShares - coreShares, 0);
-        var sellRatio = priceZoneCode == "partial_trim"
+        var sellRatio = priceZoneCode == PriceZoneCodes.PartialTrim
             ? parameters.PartialTrimRatio
             : parameters.AggressiveTrimRatio;
         var shares = FloorToTradingLot(
@@ -216,4 +228,18 @@ public static class TradeQuantityCalculator
                 parameters.MinimumTransactionFeeAmount);
 
     private static TradeQuantityResult EmptyResult() => new(0, 0, 0m, 0m);
+
+    private static string NormalizeRequiredCode(
+        string value,
+        Func<string?, bool> isSupported,
+        string parameterName)
+    {
+        var normalized = value?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!isSupported(normalized))
+        {
+            throw new ArgumentException("业务代码不受支持。", parameterName);
+        }
+
+        return normalized;
+    }
 }

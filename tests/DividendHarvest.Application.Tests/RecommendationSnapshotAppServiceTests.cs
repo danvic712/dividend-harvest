@@ -129,6 +129,8 @@ public sealed class RecommendationSnapshotAppServiceTests
             13.33m,
             "strong_buy",
             "strong_buy",
+            true,
+            "strong_buy",
             0,
             0,
             0,

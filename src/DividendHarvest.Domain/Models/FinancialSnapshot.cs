@@ -1,10 +1,9 @@
+using DividendHarvest.Domain.Codes;
+
 namespace DividendHarvest.Domain.Models;
 
 public sealed class FinancialSnapshot
 {
-    private static readonly string[] SupportedDataQualityCodes =
-        ["valid", "cautious", "stale", "missing", "conflicted"];
-
     private FinancialSnapshot()
     {
     }
@@ -80,7 +79,7 @@ public sealed class FinancialSnapshot
         }
 
         var normalizedQualityCode = dataQualityCode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (!SupportedDataQualityCodes.Contains(normalizedQualityCode, StringComparer.Ordinal))
+        if (!DataQualityCodes.IsSupported(normalizedQualityCode))
         {
             throw new ArgumentException(
                 "数据质量代码不受支持。",

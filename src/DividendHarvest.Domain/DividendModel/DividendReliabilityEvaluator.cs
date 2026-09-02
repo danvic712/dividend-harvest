@@ -1,4 +1,5 @@
 using DividendHarvest.Domain.Models;
+using DividendHarvest.Domain.Codes;
 
 namespace DividendHarvest.Domain.DividendModel;
 
@@ -19,30 +20,30 @@ public static class DividendReliabilityEvaluator
                 nameof(dataAsOfDate));
         }
 
-        var recentCancellation = dividendEvents.Any(dividendEvent =>
-            dividendEvent.DividendStatusCode == "cancelled"
-            && dividendEvent.AnnouncementDate is { } announcementDate
-            && announcementDate > dataAsOfDate.AddYears(-1)
-            && announcementDate <= dataAsOfDate);
-        if (recentCancellation)
+        if (HasRecentCancellation(dividendEvents, dataAsOfDate))
         {
-            return "re_evaluate";
+            return DividendReliabilityCodes.Failed;
         }
 
         var latestFinancialSnapshot = financialSnapshots
-            .Where(snapshot => snapshot.DataAsOfDate <= dataAsOfDate)
+            .Where(snapshot =>
+                snapshot.DataAsOfDate <= dataAsOfDate
+                && HistoricalDataAvailability.WasPublicBy(
+                    snapshot.PublishedAt,
+                    dataAsOfDate)
+                && snapshot.DataQualityCode == DataQualityCodes.Valid)
             .OrderByDescending(snapshot => snapshot.DataAsOfDate)
             .FirstOrDefault();
         if (latestFinancialSnapshot?.DividendPayoutRatio is { } payoutRatio
             && (payoutRatio <= 0 || payoutRatio >= 1))
         {
-            return "failed";
+            return DividendReliabilityCodes.Failed;
         }
 
         if (latestFinancialSnapshot?.ThreeYearAverageDividendPayoutRatio is { } averagePayoutRatio
             && (averagePayoutRatio <= 0 || averagePayoutRatio >= 1))
         {
-            return "failed";
+            return DividendReliabilityCodes.Failed;
         }
 
         var completedYears = Enumerable.Range(1, 5)
@@ -51,7 +52,10 @@ public static class DividendReliabilityEvaluator
         var annualDividends = dividendEvents
             .Where(IsUsableRegularDividend)
             .Where(dividendEvent =>
-                dividendEvent.ExDividendDate is { } exDividendDate
+                HistoricalDataAvailability.WasPublicBy(
+                    dividendEvent.PublishedAt,
+                    dataAsOfDate)
+                && dividendEvent.ExDividendDate is { } exDividendDate
                 && exDividendDate <= dataAsOfDate
                 && completedYears.Contains(exDividendDate.Year))
             .GroupBy(dividendEvent => dividendEvent.ExDividendDate!.Value.Year)
@@ -63,42 +67,65 @@ public static class DividendReliabilityEvaluator
             .Take(3)
             .Any(year => !annualDividends.ContainsKey(year)))
         {
-            return "failed";
+            return DividendReliabilityCodes.Failed;
         }
 
         if (completedYears.Any(year => !annualDividends.ContainsKey(year)))
         {
-            return "cautious";
+            return DividendReliabilityCodes.Cautious;
         }
 
         var oldestYear = completedYears[^1];
         var latestYear = completedYears[0];
         if (annualDividends[latestYear] < annualDividends[oldestYear])
         {
-            return "failed";
+            return DividendReliabilityCodes.Failed;
         }
 
         if (completedYears
             .Take(3)
             .Any(year => annualDividends[year] <= 0))
         {
-            return "failed";
+            return DividendReliabilityCodes.Failed;
         }
 
         if (latestFinancialSnapshot is null
-            || latestFinancialSnapshot.DataQualityCode != "valid"
             || latestFinancialSnapshot.DividendPayoutRatio is null
             || latestFinancialSnapshot.ThreeYearAverageDividendPayoutRatio is null)
         {
-            return "cautious";
+            return DividendReliabilityCodes.Cautious;
         }
 
-        return "passed";
+        return DividendReliabilityCodes.Passed;
+    }
+
+    public static bool HasRecentCancellation(
+        IEnumerable<DividendEvent> dividendEvents,
+        DateOnly dataAsOfDate)
+    {
+        ArgumentNullException.ThrowIfNull(dividendEvents);
+
+        if (dataAsOfDate == DateOnly.MinValue)
+        {
+            throw new ArgumentException(
+                "可靠性数据截至日期不能为空。",
+                nameof(dataAsOfDate));
+        }
+
+        return dividendEvents.Any(dividendEvent =>
+            dividendEvent.DividendStatusCode == DividendStatusCodes.Cancelled
+            && dividendEvent.DataQualityCode == DataQualityCodes.Valid
+            && HistoricalDataAvailability.WasPublicBy(
+                dividendEvent.PublishedAt,
+                dataAsOfDate)
+            && dividendEvent.AnnouncementDate is { } announcementDate
+            && announcementDate > dataAsOfDate.AddYears(-1)
+            && announcementDate <= dataAsOfDate);
     }
 
     private static bool IsUsableRegularDividend(DividendEvent dividendEvent)
-        => dividendEvent.DividendStatusCode == "implemented"
-            && dividendEvent.DividendTypeCode == "regular_cash"
+        => dividendEvent.DividendStatusCode == DividendStatusCodes.Implemented
+            && dividendEvent.DividendTypeCode == DividendTypeCodes.RegularCash
             && !dividendEvent.IsSpecialDividend
-            && dividendEvent.DataQualityCode == "valid";
+            && dividendEvent.DataQualityCode == DataQualityCodes.Valid;
 }

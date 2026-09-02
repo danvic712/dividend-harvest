@@ -1,4 +1,5 @@
 using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Stocks;
 using DividendHarvest.Configuration;
 using Microsoft.Extensions.Options;
@@ -58,16 +59,24 @@ public sealed class DailyStockDataSyncHostedService(
             logger.LogInformation(
                 "Daily stock data synchronization finished. Attempted: {Attempted}, completed: {Completed}, failed: {Failed}.",
                 result.AttemptedStockCount,
-                result.CompletedStockCount,
-                result.FailedStockCount);
+                result.FullyCompletedStockCount,
+                result.PartiallyFailedStockCount);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             return;
         }
+        catch (ApplicationExceptionBase exception)
+        {
+            logger.LogError(
+                "Daily stock data synchronization failed. Error code: {ErrorCode}.",
+                exception.ErrorCode);
+        }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Daily stock data synchronization failed.");
+            logger.LogError(
+                "Daily stock data synchronization failed with exception type {ExceptionType}.",
+                exception.GetType().Name);
         }
     }
 

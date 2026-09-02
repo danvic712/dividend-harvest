@@ -105,10 +105,11 @@ public sealed class SetupAppService(
 
         await portfolioRepository.AddAsync(
                 new PortfolioEntity
-            {
-                Id = portfolioId,
-                Name = portfolioName
-            },
+                {
+                    Id = portfolioId,
+                    Name = portfolioName,
+                    CurrencyCode = "CNY"
+                },
             cancellationToken);
 
         foreach (var stock in resolvedStocks)

@@ -57,6 +57,30 @@ public sealed class BudgetAppService(
                 reference.ExchangeCode);
         }
 
+        var sourceRecordId = request.SourceRecordId?.Trim();
+        var ledgerRepository = uow.Get<CashLedgerEntry>();
+        if (!string.IsNullOrWhiteSpace(sourceRecordId))
+        {
+            var existingEntry = await ledgerRepository
+                .GetQueryable(asNoTracking: true)
+                .SingleOrDefaultAsync(
+                    entry => entry.PortfolioId == portfolio.Id
+                        && entry.SourceRecordId == sourceRecordId,
+                    cancellationToken);
+            if (existingEntry is not null)
+            {
+                if (!MatchesRequest(existingEntry, request, security?.Id))
+                {
+                    throw new CashLedgerEntryConflictException(sourceRecordId);
+                }
+
+                return ApplicationMapper.ToCashLedgerEntryResult(
+                    existingEntry,
+                    reference?.SecurityCode,
+                    reference?.ExchangeCode);
+            }
+        }
+
         CashLedgerEntry entry;
         try
         {
@@ -74,8 +98,17 @@ public sealed class BudgetAppService(
             throw new BudgetValidationException(exception.Message);
         }
 
-        await uow.Get<CashLedgerEntry>().AddAsync(entry, cancellationToken);
-        await uow.CommitAsync(cancellationToken);
+        await ledgerRepository.AddAsync(entry, cancellationToken);
+        try
+        {
+            await uow.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(sourceRecordId))
+        {
+            // The filtered unique index protects against two concurrent retries
+            // that both pass the read-before-insert idempotency check.
+            throw new CashLedgerEntryConflictException(sourceRecordId);
+        }
 
         return ApplicationMapper.ToCashLedgerEntryResult(
             entry,
@@ -110,8 +143,21 @@ public sealed class BudgetAppService(
             portfolio.Name,
             totalInflow,
             totalOutflow,
-            Math.Max(totalInflow - totalOutflow, 0m),
+            PortfolioBudgetCalculator.CalculateCashBalance(entries),
             entries.Count,
             timeProvider.GetUtcNow());
     }
+
+    private static bool MatchesRequest(
+        CashLedgerEntry entry,
+        RecordCashLedgerEntryRequest request,
+        Guid? securityId)
+        => entry.EntryDate == request.EntryDate
+            && entry.EntryTypeCode == NormalizeCode(request.EntryTypeCode)
+            && entry.CashDirectionCode == NormalizeCode(request.CashDirectionCode)
+            && entry.CashAmount == request.CashAmount
+            && entry.SecurityId == securityId;
+
+    private static string NormalizeCode(string value)
+        => value.Trim().ToLowerInvariant();
 }

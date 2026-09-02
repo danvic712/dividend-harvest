@@ -89,7 +89,8 @@ V1 的状态规则：
 
 ```text
 数据不完整或模型股息无效 → unavailable
-明确取消分红、支付率失控或股息趋势明确恶化 → failed / re_evaluate
+支付率失控、股息趋势明确恶化或取消分红 → `dividend_reliability_code = failed`
+已确认取消分红或重大基本面事件 → 另外设置 `model_status_code = re_evaluate`
 历史数据不足但无法确认恶化 → cautious，不自动买入
 全部硬性检查通过 → available，允许按价格区域给建议
 ```

@@ -37,7 +37,7 @@ public sealed class CashLedgerEntryConfiguration
         {
             x.PortfolioId,
             x.SourceRecordId
-        });
+        }).HasFilter("source_record_id IS NOT NULL").IsUnique();
 
         builder.HasOne<Portfolio>()
             .WithMany()

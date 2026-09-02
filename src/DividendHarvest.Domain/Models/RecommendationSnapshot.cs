@@ -1,13 +1,9 @@
+using DividendHarvest.Domain.Codes;
+
 namespace DividendHarvest.Domain.Models;
 
 public sealed class RecommendationSnapshot
 {
-    private static readonly string[] SupportedModelStatusCodes =
-        ["available", "cautious", "failed", "unavailable", "re_evaluate"];
-
-    private static readonly string[] SupportedReliabilityCodes =
-        ["passed", "cautious", "failed", "unavailable"];
-
     private RecommendationSnapshot()
     {
     }
@@ -32,7 +28,11 @@ public sealed class RecommendationSnapshot
 
     public string DividendReliabilityCode { get; private set; } = string.Empty;
 
+    public string? ObservedPriceZoneCode { get; private set; }
+
     public string? PriceZoneCode { get; private set; }
+
+    public bool PriceZoneConfirmed { get; private set; }
 
     public string RecommendationCode { get; private set; } = string.Empty;
 
@@ -60,7 +60,9 @@ public sealed class RecommendationSnapshot
         string? dividendModeCode,
         string modelStatusCode,
         string dividendReliabilityCode,
+        string? observedPriceZoneCode,
         string? priceZoneCode,
+        bool priceZoneConfirmed,
         string recommendationCode,
         decimal? dividendYield,
         int suggestedBuyShares,
@@ -93,23 +95,46 @@ public sealed class RecommendationSnapshot
         ValidateOptionalRatio(dividendYield, nameof(dividendYield));
 
         var normalizedModelStatus = modelStatusCode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (!SupportedModelStatusCodes.Contains(normalizedModelStatus, StringComparer.Ordinal))
+        if (!ModelStatusCodes.IsSupported(normalizedModelStatus))
         {
             throw new ArgumentException("模型状态代码不受支持。", nameof(modelStatusCode));
         }
 
         var normalizedReliability =
             dividendReliabilityCode?.Trim().ToLowerInvariant() ?? string.Empty;
-        if (!SupportedReliabilityCodes.Contains(normalizedReliability, StringComparer.Ordinal))
+        if (!DividendReliabilityCodes.IsSupported(normalizedReliability))
         {
             throw new ArgumentException(
                 "股息可靠性代码不受支持。",
                 nameof(dividendReliabilityCode));
         }
 
-        if (string.IsNullOrWhiteSpace(recommendationCode))
+        var normalizedDividendMode = NormalizeOptionalCode(dividendModeCode);
+        if (normalizedDividendMode is not null
+            && !DividendModeCodes.IsSupported(normalizedDividendMode))
         {
-            throw new ArgumentException("建议代码不能为空。", nameof(recommendationCode));
+            throw new ArgumentException("股息模式代码不受支持。", nameof(dividendModeCode));
+        }
+
+        var normalizedObservedPriceZone = NormalizeOptionalCode(observedPriceZoneCode);
+        if (normalizedObservedPriceZone is not null
+            && !PriceZoneCodes.IsSupported(normalizedObservedPriceZone))
+        {
+            throw new ArgumentException(
+                "观测价格区域代码不受支持。",
+                nameof(observedPriceZoneCode));
+        }
+
+        var normalizedPriceZone = NormalizeOptionalCode(priceZoneCode);
+        if (normalizedPriceZone is not null && !PriceZoneCodes.IsSupported(normalizedPriceZone))
+        {
+            throw new ArgumentException("确认价格区域代码不受支持。", nameof(priceZoneCode));
+        }
+
+        var normalizedRecommendation = recommendationCode?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!RecommendationCodes.IsSupported(normalizedRecommendation))
+        {
+            throw new ArgumentException("建议代码不受支持。", nameof(recommendationCode));
         }
 
         if (suggestedBuyShares < 0)
@@ -140,6 +165,21 @@ public sealed class RecommendationSnapshot
             throw new ArgumentException("计算时间不能为空。", nameof(computedAt));
         }
 
+        ValidateSnapshotSemantics(
+            normalizedDividendMode,
+            modelDividendPerShare,
+            normalizedModelStatus,
+            normalizedReliability,
+            normalizedObservedPriceZone,
+            normalizedPriceZone,
+            priceZoneConfirmed,
+            normalizedRecommendation,
+            closePrice,
+            suggestedBuyShares,
+            suggestedSellShares,
+            suggestedTradeAmount,
+            estimatedTransactionFeeAmount);
+
         return new RecommendationSnapshot
         {
             Id = Guid.NewGuid(),
@@ -149,11 +189,13 @@ public sealed class RecommendationSnapshot
             DataAsOfDate = dataAsOfDate,
             ClosePrice = closePrice,
             ModelDividendPerShare = modelDividendPerShare,
-            DividendModeCode = NormalizeOptionalCode(dividendModeCode),
+            DividendModeCode = normalizedDividendMode,
             ModelStatusCode = normalizedModelStatus,
             DividendReliabilityCode = normalizedReliability,
-            PriceZoneCode = NormalizeOptionalCode(priceZoneCode),
-            RecommendationCode = recommendationCode.Trim().ToLowerInvariant(),
+            ObservedPriceZoneCode = normalizedObservedPriceZone,
+            PriceZoneCode = normalizedPriceZone,
+            PriceZoneConfirmed = priceZoneConfirmed,
+            RecommendationCode = normalizedRecommendation,
             DividendYield = dividendYield,
             SuggestedBuyShares = suggestedBuyShares,
             SuggestedSellShares = suggestedSellShares,
@@ -190,4 +232,128 @@ public sealed class RecommendationSnapshot
         => string.IsNullOrWhiteSpace(value)
             ? null
             : value.Trim().ToLowerInvariant();
+
+    private static void ValidateSnapshotSemantics(
+        string? dividendModeCode,
+        decimal? modelDividendPerShare,
+        string modelStatusCode,
+        string reliabilityCode,
+        string? observedPriceZoneCode,
+        string? priceZoneCode,
+        bool priceZoneConfirmed,
+        string recommendationCode,
+        decimal? closePrice,
+        int suggestedBuyShares,
+        int suggestedSellShares,
+        decimal suggestedTradeAmount,
+        decimal estimatedTransactionFeeAmount)
+    {
+        if ((modelDividendPerShare is null) != (dividendModeCode is null))
+        {
+            throw new ArgumentException("模型股息和股息模式必须同时存在或同时为空。", nameof(dividendModeCode));
+        }
+
+        if (priceZoneConfirmed != (priceZoneCode is not null))
+        {
+            throw new ArgumentException(
+                "价格区域确认标识必须与确认价格区域同时存在。",
+                nameof(priceZoneConfirmed));
+        }
+
+        if (priceZoneConfirmed
+            && !string.Equals(observedPriceZoneCode, priceZoneCode, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "确认价格区域必须与最新观测价格区域一致。",
+                nameof(priceZoneCode));
+        }
+
+        if (modelStatusCode == ModelStatusCodes.Unavailable
+            && (observedPriceZoneCode is not null || priceZoneCode is not null))
+        {
+            throw new ArgumentException(
+                "模型不可用时不能保存价格区域。",
+                nameof(priceZoneCode));
+        }
+
+        if (modelStatusCode == ModelStatusCodes.Available
+            && reliabilityCode != DividendReliabilityCodes.Passed)
+        {
+            throw new ArgumentException(
+                "模型可用时股息可靠性必须为 passed。",
+                nameof(reliabilityCode));
+        }
+
+        var mustHaveNoTrade = modelStatusCode is
+            ModelStatusCodes.Cautious
+            or ModelStatusCodes.Failed
+            or ModelStatusCodes.ReEvaluate
+            or ModelStatusCodes.Unavailable;
+        if (mustHaveNoTrade && (suggestedBuyShares > 0 || suggestedSellShares > 0))
+        {
+            throw new ArgumentException(
+                "模型未处于可用状态时不能生成交易股数。",
+                nameof(suggestedBuyShares));
+        }
+
+        var expectedRecommendation = modelStatusCode switch
+        {
+            ModelStatusCodes.Unavailable or ModelStatusCodes.Failed => RecommendationCodes.NoAction,
+            ModelStatusCodes.ReEvaluate => RecommendationCodes.ReEvaluate,
+            ModelStatusCodes.Cautious => recommendationCode is RecommendationCodes.Hold
+                or RecommendationCodes.NoAction
+                ? recommendationCode
+                : throw new ArgumentException(
+                    "谨慎参考状态只能使用 hold 或 no_action。",
+                    nameof(recommendationCode)),
+            _ when priceZoneCode is null => recommendationCode is RecommendationCodes.Hold
+                or RecommendationCodes.NoAction
+                ? recommendationCode
+                : throw new ArgumentException(
+                    "尚未确认价格区域时只能使用 hold 或 no_action。",
+                    nameof(recommendationCode)),
+            _ => priceZoneCode
+        };
+        if (!string.Equals(expectedRecommendation, recommendationCode, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "建议代码与模型状态或价格区域不一致。",
+                nameof(recommendationCode));
+        }
+
+        if (suggestedBuyShares > 0 && suggestedSellShares > 0)
+        {
+            throw new ArgumentException("同一建议快照不能同时包含买入和卖出股数。", nameof(suggestedBuyShares));
+        }
+
+        if (suggestedBuyShares > 0 || suggestedSellShares > 0)
+        {
+            if (closePrice is null)
+            {
+                throw new ArgumentException("存在建议股数时必须提供收盘价。", nameof(closePrice));
+            }
+
+            var expectedTradeAmount =
+                (suggestedBuyShares + suggestedSellShares) * closePrice.Value;
+            if (suggestedTradeAmount != expectedTradeAmount)
+            {
+                throw new ArgumentException(
+                    "建议交易金额必须等于建议股数乘以收盘价。",
+                    nameof(suggestedTradeAmount));
+            }
+        }
+        else if (suggestedTradeAmount != 0m || estimatedTransactionFeeAmount != 0m)
+        {
+            throw new ArgumentException(
+                "没有建议股数时建议交易金额和手续费必须为零。",
+                nameof(suggestedTradeAmount));
+        }
+
+        if (estimatedTransactionFeeAmount > 0m && suggestedTradeAmount == 0m)
+        {
+            throw new ArgumentException(
+                "存在交易手续费时必须同时存在建议交易金额。",
+                nameof(estimatedTransactionFeeAmount));
+        }
+    }
 }

@@ -14,8 +14,9 @@ public sealed class PortfolioRecommendationAppServiceTests
     [Fact]
     public async Task GetAsync_allocates_budget_to_strong_buy_before_accumulate()
     {
-        var firstParameter = CreateParameters();
-        var secondParameter = CreateParameters();
+        var portfolioId = Guid.NewGuid();
+        var firstParameter = CreateParameters(portfolioId);
+        var secondParameter = CreateParameters(portfolioId);
         var stocks = new[]
         {
             new StockWatchlistItem(
@@ -66,7 +67,7 @@ public sealed class PortfolioRecommendationAppServiceTests
         budgetAppService
             .Setup(x => x.GetSummaryAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BudgetSummary(
-                Guid.NewGuid(),
+                portfolioId,
                 "长期股息组合",
                 5000m,
                 0m,
@@ -97,7 +98,8 @@ public sealed class PortfolioRecommendationAppServiceTests
     [Fact]
     public async Task GetAsync_keeps_cautious_stock_without_a_trade_quantity()
     {
-        var parameter = CreateParameters();
+        var portfolioId = Guid.NewGuid();
+        var parameter = CreateParameters(portfolioId);
         var stock = new StockWatchlistItem(
             "000001",
             "SZSE",
@@ -129,7 +131,7 @@ public sealed class PortfolioRecommendationAppServiceTests
         budgetAppService
             .Setup(x => x.GetSummaryAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BudgetSummary(
-                Guid.NewGuid(),
+                portfolioId,
                 "长期股息组合",
                 5000m,
                 0m,
@@ -153,16 +155,89 @@ public sealed class PortfolioRecommendationAppServiceTests
         Assert.Equal(0m, result.TotalSuggestedTradeAmount);
     }
 
+    [Fact]
+    public async Task GetAsync_does_not_allocate_buy_budget_when_a_held_position_lacks_a_price()
+    {
+        var portfolioId = Guid.NewGuid();
+        var firstParameter = CreateParameters(portfolioId);
+        var secondParameter = CreateParameters(portfolioId);
+        var stocks = new[]
+        {
+            new StockWatchlistItem("000001", "SZSE", "平安银行", "A-share", "CNY", null),
+            new StockWatchlistItem("600001", "SSE", "示例银行", "A-share", "CNY", null)
+        };
+        var analyses = new[]
+        {
+            CreateAnalysis(
+                "000001",
+                "SZSE",
+                "平安银行",
+                "strong_buy",
+                firstParameter.Id,
+                4m,
+                heldShares: 100),
+            CreateAnalysis(
+                "600001",
+                "SSE",
+                "示例银行",
+                "hold",
+                secondParameter.Id,
+                null,
+                recommendationCode: "hold",
+                heldShares: 50)
+        };
+        var watchlistAppService = new Mock<IStockWatchlistAppService>();
+        watchlistAppService
+            .Setup(x => x.GetAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(stocks);
+        var analysisAppService = new Mock<IStockAnalysisAppService>();
+        analysisAppService
+            .SetupSequence(x => x.GetAsync(
+                It.IsAny<GetStockAnalysisRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(analyses[0])
+            .ReturnsAsync(analyses[1]);
+        var budgetAppService = new Mock<IBudgetAppService>();
+        budgetAppService
+            .Setup(x => x.GetSummaryAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BudgetSummary(
+                portfolioId,
+                "长期股息组合",
+                5000m,
+                0m,
+                5000m,
+                1,
+                new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero)));
+        var unitOfWork = new Mock<IUow>();
+        unitOfWork
+            .Setup(x => x.Get<ModelParameterSet>())
+            .Returns(CreateRepository([firstParameter, secondParameter]).Object);
+        var service = new PortfolioRecommendationAppService(
+            unitOfWork.Object,
+            watchlistAppService.Object,
+            analysisAppService.Object,
+            budgetAppService.Object,
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero)));
+
+        var result = await service.GetAsync(CancellationToken.None);
+
+        Assert.Equal(0m, result.StartingAvailableBudgetAmount);
+        Assert.Equal(0, result.Stocks[0].SuggestedBuyShares);
+        Assert.Equal(0m, result.TotalSuggestedTradeAmount);
+    }
+
     private static StockAnalysisResult CreateAnalysis(
         string securityCode,
         string exchangeCode,
         string securityName,
         string priceZoneCode,
         Guid modelParameterSetId,
-        decimal closePrice,
+        decimal? closePrice,
         string modelStatusCode = "available",
         string reliabilityCode = "passed",
-        string recommendationCode = "strong_buy")
+        string recommendationCode = "strong_buy",
+        int heldShares = 0)
         => new(
             securityCode,
             exchangeCode,
@@ -178,8 +253,10 @@ public sealed class PortfolioRecommendationAppServiceTests
             10m,
             13.33m,
             priceZoneCode,
+            priceZoneCode,
+            true,
             recommendationCode,
-            0,
+            heldShares,
             0,
             0,
             0,
@@ -191,9 +268,9 @@ public sealed class PortfolioRecommendationAppServiceTests
             new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero),
             "测试分析结果");
 
-    private static ModelParameterSet CreateParameters()
+    private static ModelParameterSet CreateParameters(Guid portfolioId)
         => ModelParameterSet.Create(
-            Guid.NewGuid(),
+            portfolioId,
             Guid.NewGuid(),
             "v1",
             0.08m,

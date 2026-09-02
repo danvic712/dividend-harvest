@@ -48,7 +48,7 @@
 
 `model_status_code = unavailable`、`failed` 或 `re_evaluate` 时，不得因为股息率很高而生成买入建议；`cautious` 只允许观察和持有，不自动买入。后面的规则不能覆盖前面的硬性阻断。
 
-状态映射固定为：可靠性检查全部通过且没有风险提醒时为 `available`；数据不足或质量、下跌风险需要人工确认时为 `cautious`；支付率失控或股息趋势明确恶化时为 `failed`；已确认取消分红或重大基本面事件时为 `re_evaluate`。
+状态映射固定为：可靠性检查全部通过且没有风险提醒时为 `available`；数据不足或质量、下跌风险需要人工确认时为 `cautious`；支付率失控、股息趋势明确恶化或取消分红时，`dividend_reliability_code = failed`；已确认取消分红或重大基本面事件另外将 `model_status_code` 设为 `re_evaluate`。`re_evaluate` 不是股息可靠性代码，两个字段可以独立表达；当前 V1 已实现取消分红检测，未来接入有明确事实来源的重大基本面事件时复用 `re_evaluate`，不从缺失指标臆测事件。
 
 计算器可以直接按以下伪代码实现：
 
@@ -87,7 +87,7 @@ else:
 | 卫星仓 | Satellite Position | — | `satellite_shares` |
 | 版本 1 | Version 1 | `V1` | `model_version` |
 
-规范写法约定：正文使用 `P/B（PB）`，不把 `PB` 展开成其他含义；“预计股息”统一称为“预计未来每股股息（Forward DPS）”；“TTM 股息”统一称为“TTM 实际每股股息（TTM DPS）”。
+规范写法约定：正文使用 `P/B（PB）`，不把 `PB` 展开成其他含义；“预计股息”统一称为“预计未来每股股息（Forward DPS）”；“TTM 股息”统一称为“TTM 实际每股股息（TTM DPS）”。“观测价格区域”表示最新有效收盘价直接计算的区域；“确认价格区域”表示连续两个有效交易日相同的区域，只有确认区域才能驱动操作建议。
 
 `D_model`、`D_TTM` 和 `D_forward` 是本文的公式变量，不是数据库字段名。数据库中不使用 `dps`、`eps`、`pb`、`roe` 这类缩写字段；展示层可以继续显示行业通用缩写。
 
@@ -107,7 +107,7 @@ PostgreSQL 未加引号的名称会折叠为小写，而 SQLite 的关键字集�
 
 ### 1.4 量化领域的规范字段
 
-以下字段名作为模型、数据同步和后续数据库表设计的 canonical names。表名可以按领域拆分，但字段名不要在不同表中重新发明同义词。
+以下字段名作为模型、数据同步和后续数据库表设计的 canonical names。表名可以按领域拆分，但字段名不要在不同表中重新发明同义词。对外接口使用 `security_code + exchange_code` 识别股票；数据库子表使用 `security_id` 作为内部外键，不把二者混为同一字段。
 
 | 领域 | 推荐字段名 | 说明 |
 | --- | --- | --- |
@@ -119,10 +119,10 @@ PostgreSQL 未加引号的名称会折叠为小写，而 SQLite 的关键字集�
 | 模型参数 | `portfolio_id`、`security_code`、`strong_buy_yield_threshold`、`accumulation_yield_threshold`、`partial_trim_yield_threshold`、`aggressive_trim_yield_threshold`、`strong_buy_budget_ratio`、`accumulate_budget_ratio`、`partial_trim_ratio`、`aggressive_trim_ratio`、`max_security_weight`、`max_sector_weight`、`cash_reserve_ratio`、`max_single_trade_amount`、`max_period_budget_amount`、`transaction_fee_ratio`、`minimum_transaction_fee_amount`、`trading_lot_size`、`model_parameter_set_id` | 阈值和比例保存为小数；参数版本不可覆盖 |
 | 模型股息输入 | `dividend_mode_code`、`ttm_dividend_per_share`、`forward_dividend_per_share`、`custom_dividend_per_share` | V1 默认使用 `ttm`；其他模式需用户主动开启 |
 | 持仓 | `held_shares`、`core_shares`、`satellite_shares`、`target_shares`、`average_cost_per_share` | 不使用含义不清的 `position` 或 `cost` |
-| 预算 | `period_budget_amount`、`carryover_cash_amount`、`received_dividend_amount`、`available_budget_amount`、`reinvestment_ratio`、`cash_direction_code` | 金额使用 `*_amount`，比例使用 `*_ratio` |
-| 建议结果 | `model_status_code`、`dividend_reliability_code`、`price_zone_code`、`recommendation_code`、`suggested_buy_shares`、`suggested_sell_shares`、`suggested_trade_amount`、`computed_at`、`model_run_id`、`model_parameter_set_id` | 建议是快照结果，不覆盖原始数据 |
+| 预算 | `period_budget_amount`、`carryover_cash_amount`、`received_dividend_amount`、`cash_balance_amount`、`available_budget_amount`、`reinvestment_ratio`、`cash_direction_code` | `cash_balance_amount` 是实际现金流水净余额；`available_budget_amount` 是扣除组合现金储备后的可用预算；金额使用 `*_amount`，比例使用 `*_ratio` |
+| 建议结果 | `model_status_code`、`dividend_reliability_code`、`observed_price_zone_code`、`price_zone_code`、`price_zone_confirmed`、`recommendation_code`、`suggested_buy_shares`、`suggested_sell_shares`、`suggested_trade_amount`、`computed_at`、`model_run_id`、`model_parameter_set_id` | `observed_price_zone_code` 是最新观测区域，`price_zone_code` 是连续两日确认区域；建议是快照结果，不覆盖原始数据 |
 
-枚举字段使用明确的 `*_code` 名称，并在应用层维护代码表。例如：`dividend_status_code` 可使用 `implemented`、`proposed`、`cancelled`；`price_zone_code` 可使用 `strong_buy`、`accumulate`、`hold`、`partial_trim`、`aggressive_trim`。数据库不保存面向用户的中文展示文案。
+业务代码字段使用明确的 `*_code` 名称，并在 Domain `Codes/` 中维护代码表。例如：`dividend_status_code` 可使用 `implemented`、`proposed`、`cancelled`；`price_zone_code` 可使用 `strong_buy`、`accumulate`、`hold`、`partial_trim`、`aggressive_trim`。数据库不保存面向用户的中文展示文案。
 
 V1 建议的代码值：
 
@@ -147,19 +147,19 @@ V1 不需要复杂的数据仓库。以下九张表足以支持行情、分红�
 | --- | --- | --- |
 | `portfolios` | 投资组合资料 | `portfolio_id`、`portfolio_name`、`currency_code` |
 | `securities` | 股票基础资料 | `security_code`、`exchange_code`、`security_name`、`market_code`、`currency_code` |
-| `price_observations` | 收盘行情 | `security_code`、`trading_date`、`close_price`、`price_observed_at`、`data_source`、`source_record_id` |
-| `dividend_events` | 分红事实 | `security_code`、`dividend_per_share`、`dividend_type_code`、`dividend_status_code`、`announcement_date`、`ex_dividend_date`、`payment_date`、`is_special_dividend`、`published_at`、`captured_at`、`data_source`、`source_record_id`、`data_quality_code` |
-| `financial_snapshots` | 财务事实和指标 | `security_code`、`data_as_of_date`、`published_at`、`captured_at`、`data_source`、`source_record_id`、`earnings_per_share`、`dividend_payout_ratio`、`price_to_book_ratio`、`return_on_equity`、`data_quality_code` |
-| `portfolio_positions` | 当前持仓 | `portfolio_id`、`security_code`、`held_shares`、`core_shares`、`target_shares`、`average_cost_per_share` |
-| `cash_ledger_entries` | 预算和实际现金流水 | `portfolio_id`、`entry_date`、`entry_type_code`、`cash_direction_code`、`cash_amount`、`security_code`、`source_record_id` |
-| `model_parameter_sets` | 模型参数 | `model_parameter_set_id`、`portfolio_id`、`security_code`、`model_version`、四个收益率阈值、买卖比例、组合上限、交易费用、`trading_lot_size`、`effective_from_date` |
-| `recommendation_snapshots` | 某次计算结果 | `model_run_id`、`portfolio_id`、`security_code`、`data_as_of_date`、`close_price`、`model_dividend_per_share`、`dividend_mode_code`、`model_status_code`、`dividend_reliability_code`、`price_zone_code`、`recommendation_code`、`dividend_yield`、`suggested_buy_shares`、`suggested_sell_shares`、`suggested_trade_amount`、`computed_at`、`model_parameter_set_id` |
+| `price_observations` | 收盘行情 | `security_id`、`trading_date`、`close_price`、`price_observed_at`、`data_source`、`source_record_id`、`data_quality_code` |
+| `dividend_events` | 分红事实 | `security_id`、`dividend_per_share`、`dividend_type_code`、`dividend_status_code`、`announcement_date`、`ex_dividend_date`、`payment_date`、`is_special_dividend`、`published_at`、`captured_at`、`data_source`、`source_record_id`、`data_quality_code` |
+| `financial_snapshots` | 财务事实和指标 | `security_id`、`data_as_of_date`、`published_at`、`captured_at`、`data_source`、`source_record_id`、`earnings_per_share`、`dividend_payout_ratio`、`price_to_book_ratio`、`return_on_equity`、`data_quality_code` |
+| `portfolio_positions` | 当前持仓 | `portfolio_id`、`security_id`、`held_shares`、`core_shares`、`target_shares`、`average_cost_per_share` |
+| `cash_ledger_entries` | 预算和实际现金流水 | `portfolio_id`、`entry_date`、`entry_type_code`、`cash_direction_code`、`cash_amount`、`security_id`、`source_record_id` |
+| `model_parameter_sets` | 模型参数 | `model_parameter_set_id`、`portfolio_id`、`security_id`、`model_version`、四个收益率阈值、买卖比例、组合上限、交易费用、`trading_lot_size`、`effective_from_date` |
+| `recommendation_snapshots` | 某次计算结果 | `model_run_id`、`portfolio_id`、`security_id`、`data_as_of_date`、`close_price`、`model_dividend_per_share`、`dividend_mode_code`、`model_status_code`、`dividend_reliability_code`、`observed_price_zone_code`、`price_zone_code`、`price_zone_confirmed`、`recommendation_code`、`dividend_yield`、`suggested_buy_shares`、`suggested_sell_shares`、`suggested_trade_amount`、`computed_at`、`model_parameter_set_id` |
 
 事实表保存来源数据，建议快照保存可重算的派生结果。`dividend_yield`、`price_zone_code`、`suggested_buy_shares` 和 `suggested_sell_shares` 不应覆盖事实表中的数据。
 
-V1 的参数按 `portfolio_id + security_code` 生效；如果未来需要组合级默认值，可以允许 `security_code` 为空，但同一次计算必须能解析出唯一的有效参数集。
+V1 的参数按 `portfolio_id + security_id` 生效；如果未来需要组合级默认值，可以允许股票标识为空，但同一次计算必须能解析出唯一的有效参数集。V1 是单用户、单组合上下文，建账完成后不允许创建第二个组合；接口不要求调用方传 `portfolio_id`，由 Application 解析唯一组合。
 
-V1 的最低约束：价格必须大于 0；股数和金额不能为负；现金流水通过 `cash_direction_code` 区分流入和流出；比例必须在 0 到 1 之间；核心仓不能大于当前持股；四个收益率阈值必须满足 `strong_buy > accumulation > partial_trim > aggressive_trim > 0`。`recommendation_snapshots` 使用 `model_run_id + portfolio_id + security_code` 作为唯一计算结果标识。股票代码在交易所内唯一；如果数据源允许不同交易所使用相同代码，子表外键使用 `exchange_code + security_code` 的组合。
+V1 的最低约束：价格必须大于 0；股数和金额不能为负；现金流水通过 `cash_direction_code` 区分流入和流出；比例必须在 0 到 1 之间；核心仓不能大于当前持股；四个收益率阈值必须满足 `strong_buy > accumulation > partial_trim > aggressive_trim > 0`。`recommendation_snapshots` 使用 `model_run_id + portfolio_id + security_id` 作为唯一计算结果标识。股票代码在交易所内唯一；对外使用 `exchange_code + security_code`，数据库子表使用 `security_id` 外键。
 
 ## 2. 投资对象和仓位结构
 
@@ -191,7 +191,7 @@ V1 的最低约束：价格必须大于 0；股数和金额不能为负；现金
 
 模型股息是用于计算股息率和价格区域的每股年度现金股息。它不等同于用户已经收到的股息。
 
-为了让 V1 可直接实现，实时建议默认只使用一种口径：
+为了让 V1 可直接实现，建议计算默认只使用一种口径：
 
 ```text
 TTM DPS = 最近 12 个日历月内、截至 data_as_of_date 已实施的常规现金股息之和
@@ -232,7 +232,9 @@ source_record_id 来源记录标识
 data_quality_code 数据质量状态
 ```
 
-历史回放时，只能使用当时已经公开的数据，不能使用后来修订的股息、盈利或 P/B（PB）数据。否则回测结果会提前知道未来信息。
+`source_record_id` 是来源记录标识，同时承担同一数据来源内的幂等键语义；它不表示本地数据库主键。用户导入的交易和现金流水按 `portfolio_id + source_record_id` 去重：请求内容完全相同则返回原记录，内容不同则返回冲突。交易自动生成的现金流水使用 `portfolio_trade:{trade_id}:principal` 和 `portfolio_trade:{trade_id}:fee` 这样的命名空间值，不能与 FTShare 的来源标识混用。
+
+历史回放时，只能使用当时已经公开的数据，不能使用后来修订的股息、盈利或 P/B（PB）数据。实现上，存在 `published_at` 的事实只有在其日期不晚于 `data_as_of_date` 时可用；缺失 `published_at` 的旧事实可以参与 V1 当前计算，但必须保留“公开时间未知”的数据质量语义，不能补造公开时间。否则回测结果会提前知道未来信息。
 
 ### 3.3 模型不可用
 
@@ -358,13 +360,24 @@ Q80（80th Percentile，80 分位数）、Q60、Q40、Q20 可以在后续版本�
 - 新区域连续两个有效交易日成立后才更新建议；
 - 不在 V1 同时引入进入缓冲区和退出缓冲区两套参数。
 
-系统可以实时展示当前股息率，但操作建议应使用已确认的日级快照。
+系统可以实时展示当前股息率，但操作建议应使用已确认的日级快照。输出中：
+
+- `observed_price_zone_code` 是最新一条 `data_quality_code = valid` 收盘行情直接计算出的区域；
+- `price_zone_code` 是按交易日期去重后的最近两个有效交易日使用同一份当前模型参数和 `D_model` 计算，并且区域一致后的确认区域，未确认时为空；
+- `price_zone_confirmed` 表示确认区域是否存在；未确认时只能返回 `hold` 或 `no_action`，不能生成买入或减仓股数；
+- `close_price` 是用于本次模型计算的最新有效收盘价，不是未持久化的盘中实时价。
 
 ## 6. 买入建议股数
 
 ### 6.1 可用预算
 
-组合或单只股票的本期可用预算为：
+组合的现金余额与本期可用预算是两个不同概念。现金余额来自实际现金流水：
+
+```text
+cash_balance_amount = 现金流入合计 - 现金流出合计
+```
+
+组合的本期可用预算为：
 
 ```text
 B_period = 本期新增预算
@@ -372,12 +385,12 @@ B_period = 本期新增预算
          + 已实际收到的股息 × 计划再投资比例
 
 available_budget_amount = max(
-    B_period - 为满足 cash_reserve_ratio 所需保留的现金,
+    cash_balance_amount - 组合市值 × cash_reserve_ratio,
     0
 )
 ```
 
-`cash_reserve_ratio` 由组合层根据当前组合价值计算最低现金储备；`available_budget_amount` 已经扣除该储备。计划再投资比例只影响规划预算，不代表系统已经收到股息。未到账的预计股息不能直接作为现金使用。
+V1 当前现金流水把本期新增预算、结转现金和已到账股息统一记录为实际流入；因此 `B_period` 是规划公式，`cash_balance_amount` 是持久化流水计算结果。`cash_reserve_ratio` 是组合层约束；每只股票可以保存该参数，但同一组合计算时使用当前有效参数中的最大值，保证任何股票的最低现金储备都不会被突破。`available_budget_amount` 已经扣除该储备。计划再投资比例只影响规划预算，不代表系统已经收到股息。未到账的预计股息不能直接作为现金使用。
 
 ### 6.2 区域资金比例
 
@@ -549,6 +562,8 @@ model_dividend_per_share
 dividend_mode_code
 dividend_yield
 price_zone_code
+observed_price_zone_code
+price_zone_confirmed
 recommendation_code
 suggested_buy_shares
 suggested_sell_shares
@@ -608,9 +623,11 @@ V1 第一验收目标不是证明跑赢市场，而是确认：相同数据快�
 | 支付率小于等于 0 或大于等于 1 | `dividend_reliability_code = failed`，不自动买入 |
 | 已确认取消分红 | `model_status_code = re_evaluate`，不自动交易 |
 | 当前价格进入 `strong_buy` 且预算足够 | 按预算、组合上限和 `trading_lot_size` 向下取整 |
+| 只有一个有效交易日或最近两日价格区域不同 | 保留观测区域但不填写确认区域，不生成交易股数 |
 | 当前持股低于核心仓 | `satellite_shares = 0`，不生成普通减仓 |
 | 当前价格进入减仓区 | 卖出股数不超过 `held_shares - core_shares` |
 | 同一数据快照重复计算 | 结果字段完全一致，参数使用同一个 `model_parameter_set_id` |
+| 相同现金流水来源记录重复提交 | 返回原流水；同一来源标识对应不同金额或类型时返回冲突 |
 
 ## 14. V1 实现顺序
 

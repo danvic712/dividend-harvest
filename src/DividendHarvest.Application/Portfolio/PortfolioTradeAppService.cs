@@ -70,6 +70,11 @@ public sealed class PortfolioTradeAppService(
                 cancellationToken);
         if (existingTrade is not null)
         {
+            if (!MatchesRequest(existingTrade, request, security.Id))
+            {
+                throw new PortfolioTradeConflictException(sourceRecordId!);
+            }
+
             if (position is null)
             {
                 throw new PortfolioTradeValidationException(
@@ -144,7 +149,7 @@ public sealed class PortfolioTradeAppService(
                 trade.TradeDirectionCode,
                 trade.TradeDirectionCode == "buy" ? "outflow" : "inflow",
                 cashAmount,
-                $"{trade.Id}:trade"),
+                $"portfolio_trade:{trade.Id}:principal"),
             cancellationToken);
         if (trade.TransactionFeeAmount > 0)
         {
@@ -156,11 +161,20 @@ public sealed class PortfolioTradeAppService(
                     "fee",
                     "outflow",
                     trade.TransactionFeeAmount,
-                    $"{trade.Id}:fee"),
+                    $"portfolio_trade:{trade.Id}:fee"),
                 cancellationToken);
         }
 
-        await uow.CommitAsync(cancellationToken);
+        try
+        {
+            await uow.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(sourceRecordId))
+        {
+            // The filtered unique index protects against concurrent duplicate
+            // submissions that both pass the read-before-insert check.
+            throw new PortfolioTradeConflictException(sourceRecordId);
+        }
 
         return ToResult(trade, portfolio, reference, position);
     }
@@ -185,4 +199,18 @@ public sealed class PortfolioTradeAppService(
             position.TargetShares,
             position.AverageCostPerShare,
             trade.ShareQuantity * trade.PricePerShare);
+
+    private static bool MatchesRequest(
+        PortfolioTrade trade,
+        RecordPortfolioTradeRequest request,
+        Guid securityId)
+        => trade.SecurityId == securityId
+            && trade.TradeDate == request.TradeDate
+            && trade.TradeDirectionCode == NormalizeCode(request.TradeDirectionCode)
+            && trade.ShareQuantity == request.ShareQuantity
+            && trade.PricePerShare == request.PricePerShare
+            && trade.TransactionFeeAmount == request.TransactionFeeAmount;
+
+    private static string NormalizeCode(string value)
+        => value.Trim().ToLowerInvariant();
 }

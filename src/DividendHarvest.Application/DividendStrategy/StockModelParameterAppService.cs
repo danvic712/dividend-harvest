@@ -79,7 +79,7 @@ public sealed class StockModelParameterAppService(
 
         var portfolio = await uow.Get<PortfolioEntity>()
             .GetQueryable(asNoTracking: true)
-            .FirstOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
         {
             throw new SetupNotCompletedException();

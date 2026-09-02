@@ -14,4 +14,4 @@ public sealed record PortfolioTradeResult(
     int CoreShares,
     int TargetShares,
     decimal AverageCostPerShare,
-    decimal CashAmount);
+    decimal TradePrincipalAmount);

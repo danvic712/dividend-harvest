@@ -4,7 +4,9 @@ using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.DividendModel;
+using DividendHarvest.Domain.Codes;
 using DividendHarvest.Domain.Models;
+using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -51,13 +53,15 @@ public sealed class StockAnalysisAppService(
                 && parameter.EffectiveFromDate <= currentDate)
             .OrderByDescending(parameter => parameter.EffectiveFromDate)
             .FirstOrDefaultAsync(cancellationToken);
-        var priceObservation = await uow.Get<PriceObservation>()
+        var priceObservations = await uow.Get<PriceObservation>()
             .GetQueryable(asNoTracking: true)
             .Where(observation =>
                 observation.SecurityId == security.Id
-                && observation.TradingDate <= currentDate)
+                && observation.TradingDate <= currentDate
+                && observation.DataQualityCode == DataQualityCodes.Valid)
             .OrderByDescending(observation => observation.TradingDate)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var priceObservation = priceObservations.FirstOrDefault();
         var dividendEvents = await uow.Get<DividendEvent>()
             .GetQueryable(asNoTracking: true)
             .Where(dividendEvent => dividendEvent.SecurityId == security.Id)
@@ -83,7 +87,7 @@ public sealed class StockAnalysisAppService(
                 dividendEvents,
                 priceObservation.TradingDate);
         var reliabilityCode = modelDividendPerShare is null
-            ? "unavailable"
+            ? DividendReliabilityCodes.Unavailable
             : DividendReliabilityEvaluator.Evaluate(
                 dividendEvents,
                 financialSnapshots,
@@ -106,23 +110,24 @@ public sealed class StockAnalysisAppService(
                 computedAt);
         }
 
+        var hasRecentCancellation = DividendReliabilityEvaluator.HasRecentCancellation(
+            dividendEvents,
+            priceObservation.TradingDate);
+
         var cashEntries = await uow.Get<CashLedgerEntry>()
             .GetQueryable(asNoTracking: true)
             .Where(entry => entry.PortfolioId == parameters.PortfolioId)
             .ToListAsync(cancellationToken);
-        var ledgerBalance = cashEntries
-            .Where(entry => entry.CashDirectionCode == "inflow")
-            .Sum(entry => entry.CashAmount)
-            - cashEntries
-                .Where(entry => entry.CashDirectionCode == "outflow")
-                .Sum(entry => entry.CashAmount);
+        var cashBalanceAmount = PortfolioBudgetCalculator.CalculateCashBalance(cashEntries);
         var portfolioPositions = await uow.Get<PortfolioPosition>()
             .GetQueryable(asNoTracking: true)
             .Where(currentPosition => currentPosition.PortfolioId == parameters.PortfolioId)
             .ToListAsync(cancellationToken);
         var portfolioPriceObservations = await uow.Get<PriceObservation>()
             .GetQueryable(asNoTracking: true)
-            .Where(observation => observation.TradingDate <= currentDate)
+            .Where(observation =>
+                observation.TradingDate <= currentDate
+                && observation.DataQualityCode == DataQualityCodes.Valid)
             .ToListAsync(cancellationToken);
         var latestPrices = portfolioPriceObservations
             .GroupBy(observation => observation.SecurityId)
@@ -136,29 +141,50 @@ public sealed class StockAnalysisAppService(
             .Sum(currentPosition =>
                 currentPosition.HeldShares
                 * latestPrices[currentPosition.SecurityId].ClosePrice);
-        var availableBudgetAmount = Math.Max(
-            ledgerBalance
-                - totalPortfolioValue * parameters.CashReserveRatio,
-            0m);
-        var modelStatusCode = reliabilityCode switch
-        {
-            "passed" => "available",
-            "failed" => "failed",
-            "re_evaluate" => "re_evaluate",
-            _ => "cautious"
-        };
-        var priceZone = DividendPriceZoneCalculator.Calculate(
+        var portfolioValuationComplete = PortfolioBudgetCalculator.HasCompleteMarketValue(
+            portfolioPositions,
+            latestPrices.Keys.ToHashSet());
+        var portfolioParameters = await uow.Get<ModelParameterSet>()
+            .GetQueryable(asNoTracking: true)
+            .Where(parameter =>
+                parameter.PortfolioId == parameters.PortfolioId
+                && parameter.EffectiveFromDate <= currentDate)
+            .ToListAsync(cancellationToken);
+        var cashReserveRatio = PortfolioBudgetCalculator.CalculateCurrentCashReserveRatio(
+            portfolioParameters,
+            currentDate);
+        var availableBudgetAmount = portfolioValuationComplete
+            ? PortfolioBudgetCalculator.CalculateAvailableBudget(
+                cashBalanceAmount,
+                totalPortfolioValue,
+                cashReserveRatio)
+            : 0m;
+        var modelStatusCode = hasRecentCancellation
+            ? ModelStatusCodes.ReEvaluate
+            : reliabilityCode switch
+            {
+                DividendReliabilityCodes.Passed => ModelStatusCodes.Available,
+                DividendReliabilityCodes.Failed => ModelStatusCodes.Failed,
+                _ => ModelStatusCodes.Cautious
+            };
+        var priceZoneValues = DividendPriceZoneCalculator.Calculate(
             parameters,
             modelDividendPerShare.Value,
             priceObservation.ClosePrice);
-        var recommendationCode = reliabilityCode == "passed"
-            ? priceZone.PriceZoneCode
-            : "no_action";
+        var priceZoneConfirmation = PriceZoneConfirmationCalculator.Calculate(
+            parameters,
+            modelDividendPerShare.Value,
+            priceObservations);
+        var operationPriceZoneCode =
+            priceZoneConfirmation.ConfirmedPriceZoneCode ?? PriceZoneCodes.Hold;
+        var recommendationCode = GetRecommendationCode(
+            modelStatusCode,
+            priceZoneConfirmation.ConfirmedPriceZoneCode);
         var tradeQuantity = TradeQuantityCalculator.Calculate(
             parameters,
             modelStatusCode,
             reliabilityCode,
-            priceZone.PriceZoneCode,
+            operationPriceZoneCode,
             priceObservation.ClosePrice,
             heldShares,
             coreShares,
@@ -169,9 +195,10 @@ public sealed class StockAnalysisAppService(
                 ? 0m
                 : position.HeldShares * priceObservation.ClosePrice,
             null);
-        var explanation = reliabilityCode == "passed"
-            ? "股息可靠性检查通过，当前价格区域可用于生成后续预算建议。"
-            : "TTM 股息率和价格区域已计算，但股息可靠性资料尚未完整，当前只提供谨慎参考。";
+        var explanation = BuildExplanation(
+            modelStatusCode,
+            priceZoneConfirmation.IsConfirmed,
+            priceZoneConfirmation.ConfirmedPriceZoneCode);
 
         return new StockAnalysisResult(
             reference.SecurityCode,
@@ -181,13 +208,15 @@ public sealed class StockAnalysisAppService(
             reliabilityCode,
             priceObservation.ClosePrice,
             modelDividendPerShare,
-            "ttm",
-            priceZone.DividendYield,
-            priceZone.StrongBuyPrice,
-            priceZone.AccumulatePrice,
-            priceZone.PartialTrimPrice,
-            priceZone.AggressiveTrimPrice,
-            priceZone.PriceZoneCode,
+            DividendModeCodes.Ttm,
+            priceZoneValues.DividendYield,
+            priceZoneValues.StrongBuyPrice,
+            priceZoneValues.AccumulatePrice,
+            priceZoneValues.PartialTrimPrice,
+            priceZoneValues.AggressiveTrimPrice,
+            priceZoneConfirmation.ObservedPriceZoneCode,
+            priceZoneConfirmation.ConfirmedPriceZoneCode,
+            priceZoneConfirmation.IsConfirmed,
             recommendationCode,
             heldShares,
             coreShares,
@@ -201,6 +230,36 @@ public sealed class StockAnalysisAppService(
             computedAt,
             explanation);
     }
+
+    private static string GetRecommendationCode(
+        string modelStatusCode,
+        string? confirmedPriceZoneCode)
+        => modelStatusCode switch
+        {
+            ModelStatusCodes.ReEvaluate => RecommendationCodes.ReEvaluate,
+            ModelStatusCodes.Failed or ModelStatusCodes.Unavailable => RecommendationCodes.NoAction,
+            ModelStatusCodes.Cautious => RecommendationCodes.Hold,
+            _ => confirmedPriceZoneCode ?? RecommendationCodes.Hold
+        };
+
+    private static string BuildExplanation(
+        string modelStatusCode,
+        bool priceZoneConfirmed,
+        string? confirmedPriceZoneCode)
+        => modelStatusCode switch
+        {
+            ModelStatusCodes.Unavailable =>
+                "缺少有效模型参数、行情或 TTM 实际股息，暂不生成价格区域和交易建议。",
+            ModelStatusCodes.ReEvaluate =>
+                "最近存在已确认取消分红的事件，需要重新评估核心仓和后续操作，当前不生成交易建议。",
+            ModelStatusCodes.Failed =>
+                "股息可靠性检查未通过，当前只展示行情和持仓信息，不生成交易建议。",
+            ModelStatusCodes.Cautious =>
+                "股息率和价格区域可以计算，但可靠性资料不足或存在风险提醒，当前仅谨慎持有。",
+            _ when !priceZoneConfirmed =>
+                "模型资料完整，但新的价格区域尚未连续两个有效交易日确认，当前仅观察。",
+            _ => $"股息可靠性检查通过，已确认当前价格区域为 {confirmedPriceZoneCode}。"
+        };
 
     private static StockAnalysisResult CreateUnavailableResult(
         Security security,
@@ -216,18 +275,20 @@ public sealed class StockAnalysisAppService(
             reference.SecurityCode,
             reference.ExchangeCode,
             security.SecurityName,
-            "unavailable",
+            ModelStatusCodes.Unavailable,
             reliabilityCode,
             priceObservation?.ClosePrice,
             modelDividendPerShare,
-            modelDividendPerShare is null ? null : "ttm",
+            modelDividendPerShare is null ? null : DividendModeCodes.Ttm,
             null,
             null,
             null,
             null,
             null,
             null,
-            "no_action",
+            null,
+            false,
+            RecommendationCodes.NoAction,
             heldShares,
             coreShares,
             satelliteShares,

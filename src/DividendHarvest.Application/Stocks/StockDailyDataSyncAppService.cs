@@ -16,7 +16,7 @@ public sealed class StockDailyDataSyncAppService(
     {
         var watchlist = await stockWatchlistAppService.GetAsync(cancellationToken);
         var failures = new List<StockDataSyncFailure>();
-        var completedStockCount = 0;
+        var fullyCompletedStockCount = 0;
 
         foreach (var stock in watchlist)
         {
@@ -56,13 +56,13 @@ public sealed class StockDailyDataSyncAppService(
 
             if (failures.Count == stockFailuresBeforeSync)
             {
-                completedStockCount++;
+                fullyCompletedStockCount++;
             }
         }
 
         return new StockDataSyncRunResult(
             watchlist.Count,
-            completedStockCount,
+            fullyCompletedStockCount,
             failures
                 .Select(failure => (failure.SecurityCode, failure.ExchangeCode))
                 .Distinct()
@@ -92,6 +92,7 @@ public sealed class StockDailyDataSyncAppService(
                 stock.SecurityCode,
                 stock.ExchangeCode,
                 dataKind,
+                (exception as ApplicationExceptionBase)?.ErrorCode ?? "stock_data_sync_failed",
                 exception.Message));
         }
     }

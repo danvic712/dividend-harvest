@@ -5,6 +5,6 @@ public sealed record BudgetSummary(
     string PortfolioName,
     decimal TotalInflowAmount,
     decimal TotalOutflowAmount,
-    decimal AvailableBudgetAmount,
+    decimal CashBalanceAmount,
     int EntryCount,
     DateTimeOffset ComputedAt);

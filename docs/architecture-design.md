@@ -57,7 +57,8 @@ src/
 │   │   ├── CashLedgerEntry.cs
 │   │   ├── RecommendationSnapshot.cs
 │   │   └── PortfolioTrade.cs
-│   ├── Enums/                          # 枚举；当前暂无枚举
+│   ├── Codes/                          # 业务代码表（状态、区域和建议）
+│   ├── Enums/                           # 真正的枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   ├── Securities/                     # A 股标识领域规则
 │   └── DividendModel/                  # 股息率与价格区域计算
@@ -136,7 +137,7 @@ Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfo
 1. 本项目声明的所有 Interface 必须位于所属项目的 `Contracts/` 文件夹；一个文件只放一个 Interface。
 2. 所有 DTO 必须位于 `Dtos/` 文件夹；一个 DTO 文件只允许包含一个 DTO class/record。
 3. 所有自定义 Exception 必须位于 `Exceptions/` 文件夹；一个文件只放一个 Exception。
-4. 如果新增枚举，必须放到所属项目的 `Enums/` 文件夹；当前代码没有枚举，不创建空的伪实现。
+4. 如果新增真正的枚举，必须放到所属项目的 `Enums/` 文件夹；字符串业务代码集中放在 `Codes/`，不创建空的伪实现。
 5. `Application` 的业务实现类使用 `*AppService` 后缀；对应 Interface 使用 `I*AppService`。
 6. 数据访问实现按照 `salary-insights` 拆分到 `Infrastructure/Repositories/` 和 Infrastructure 根目录的 DbContext，不使用单独的 `Persistence` 命名层。
 
@@ -228,6 +229,7 @@ SetupAppService
 - `DividendHarvestDbContext` 位于 Infrastructure 根目录；`EFRepository<TEntity>` 和 `EFUow` 位于 `Infrastructure/Repositories/`，均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
 - Host 的 `/healthz`、`/readyz` 使用 ASP.NET Core 原生 Health Checks；数据库健康检查通过 `IUow.CanConnectAsync` 实现。健康检查是运行状态入口，不属于业务 API 版本范围。
 - Host 的启动建库只能通过 `IUow.EnsureCreatedAsync`，不直接解析 DbContext。
+- `EFUow.EnsureCreatedAsync` 在 SQLite 启动时执行幂等的兼容升级，为既有 `/app/data` 数据库补齐新增字段、默认值和现金流水幂等唯一索引；未来新增表结构必须沿用可回放的迁移/升级步骤，不能只修改 Fluent Configuration。
 - 数据库通过 Docker volume 持久化到 `/app/data`；镜像本身不保存用户数据。
 
 ## 7. Domain Models 与 Fluent 配置
@@ -329,33 +331,33 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 ### 8.7 组合现金流水与预算摘要
 
-`POST /api/v1/budgets/entries` 通过 `IBudgetAppService` 记录组合层的实际现金流水，支持预算入金、已收到股息、买入、卖出、费用和现金调整。股票相关流水必须关联已配置的 A 股；代码和流水类型/方向由 FluentValidation 与 Domain 规则共同校验。`GET /api/v1/budgets/summary` 按组合汇总流入和流出，并计算 `max(total_inflow_amount - total_outflow_amount, 0)` 作为当前可用预算。
+`POST /api/v1/budgets/entries` 通过 `IBudgetAppService` 记录组合层的实际现金流水，支持预算入金、已收到股息、买入、卖出、费用和现金调整。股票相关流水必须关联已配置的 A 股；代码和流水类型/方向由 FluentValidation 与 Domain 规则共同校验。`GET /api/v1/budgets/summary` 按组合汇总流入和流出，并返回 `cash_balance_amount = total_inflow_amount - total_outflow_amount`。它是实际现金流水余额，不是已经扣除现金储备的可用预算；组合建议用例再根据组合市值和当前有效参数的最大 `cash_reserve_ratio` 计算 `available_budget_amount`。
 
 现金流水是用户实际资金的来源；预计股息不会自动写入流水，也不会因为 TTM 股息存在而增加预算。该摘要为股票分析和组合建议提供可追溯的预算输入；现金保留比例在建议计算中应用，再投资比例和自动记录实际股息仍由后续现金流水录入流程负责。
 
 ### 8.8 当前股票分析
 
-`GET /api/v1/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
+`GET /api/v1/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、按交易日期去重后的最近两个有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。`ObservedPriceZoneCode` 是最新有效收盘价的直接区域，`PriceZoneCode` 只有在最近两个有效交易日一致时才有值；未确认时不生成买入或减仓股数。历史回放中的股息和财务事实还必须满足 `published_at` 不晚于 `data_as_of_date`；缺失公开时间的事实仍可参与当前 V1 计算，但不应被伪造为有明确公开时点。
 
-分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序和集中度竞争由组合建议用例统一处理，建议快照由独立用例保存。
+分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；取消分红时可靠性代码为 `failed`，模型状态单独为 `re_evaluate`，建议代码为 `re_evaluate`。当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序和集中度竞争由组合建议用例统一处理，建议快照由独立用例保存。
 
 ### 8.9 多股票组合建议
 
 `GET /api/v1/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的分析结果、有效模型参数和组合预算，在组合层统一分配本期可用资金。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
 
-组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、行业/单股/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。`Security.SectorCode` 来自 FTShare 股票资料的可选 `sector_code`/`industry_code` 字段；缺失行业资料时跳过行业上限，不推断或伪造行业归属。
+组合建议会先从现金流水余额扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、行业/单股/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。现金保留比例虽然按股票参数保存，但组合计算取当前有效参数中的最大值。减仓仍保护核心仓，不占用买入预算。`Security.SectorCode` 来自 FTShare 股票资料的可选 `sector_code`/`industry_code` 字段；缺失行业资料时跳过行业上限，不推断或伪造行业归属。
 
 `POST /api/v1/recommendations/snapshots` 使用同一份组合建议生成唯一 `model_run_id`，在一个 UoW 提交中保存每只股票的 `RecommendationSnapshot`。快照保留原始数据日期、参数版本、状态、价格区域和建议数量，不覆盖行情、股息、财务或现金流水事实，便于复现和后续回放。
 
 ### 8.10 交易日数据同步
 
-`IStockDailyDataSyncAppService` 按关注列表逐只编排行情、股息和财务快照同步；失败项记录股票、数据类型和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。`POST /api/v1/stocks/sync` 提供手动触发入口。
+`IStockDailyDataSyncAppService` 按关注列表逐只编排行情、股息和财务快照同步；失败项记录股票、数据类型、稳定 `error_code` 和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计三类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
 
 Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailySync:TimeZoneId` 调度，默认使用上海时间每日 18:00，并跳过周末；A 股法定节假日由数据源实际返回结果决定，重复快照通过事实同步用例幂等处理。生产环境可以通过 `DailySync:Enabled=false` 关闭后台调度而保留手动接口。
 
 ### 8.11 交易记录与持仓成本
 
-`POST /api/v1/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；实际卖出只不能超过当前持股，允许真实历史交易使当前持仓低于核心仓。核心仓保护只用于系统生成普通减仓建议，不阻止用户补录已经发生的交易。提供 `source_record_id` 时，按组合范围幂等处理重复提交。每次新交易与对应买卖现金流水、手续费流水在同一个 UoW 中提交，实际现金余额不会依赖模型股息推算。
+`POST /api/v1/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；实际卖出只不能超过当前持股，允许真实历史交易使当前持仓低于核心仓。核心仓保护只用于系统生成普通减仓建议，不阻止用户补录已经发生的交易。提供 `source_record_id` 时，按组合范围幂等处理重复提交；同一来源标识如果对应不同股票、日期、方向、股数、价格或手续费，返回 409 冲突而不是静默复用。交易响应中的 `TradePrincipalAmount` 只表示成交本金，手续费单独由 `TransactionFeeAmount` 表示。每次新交易与对应买卖现金流水、手续费流水在同一个 UoW 中提交，自动流水来源标识使用 `portfolio_trade:{trade_id}:principal` 或 `portfolio_trade:{trade_id}:fee`，实际现金余额不会依赖模型股息推算。
 
 ## 9. FTShare MCP Adapter
 
@@ -394,6 +396,7 @@ Application 使用 Riok.Mapperly 生成编译期映射代码，统一的映射�
 
 - 使用 `Asp.Versioning.Mvc` 和 `Asp.Versioning.Mvc.ApiExplorer` 为 Controller API 提供版本元数据与 OpenAPI 分组。
 - 当前业务 API 为 v1，Controller 使用 `[ApiVersion(1.0)]`，路由使用 `api/v{version:apiVersion}/...`；调用方必须显式携带 `/api/v1/...`。
+- 本仓库当前仍处于前端正式接入前的私人工具原型阶段；本次统一语义和字段命名属于 v1 合约冻结前的明确修正，已同步到 OpenAPI 说明和架构文档，不是对已发布 v1 合约的静默变更。从本次修正之后，面向外部调用方的破坏性修改必须进入 v2。
 - Host 使用 `UrlSegmentApiVersionReader`，不假设缺失版本时自动使用默认版本，并通过 `ReportApiVersions` 返回支持/弃用版本信息。
 - 健康检查、Swagger UI 和 Swagger JSON 使用自身的基础路径，不强行套用业务 API 版本。
 - 新增破坏性合约时增加 v2 版本元数据和对应文档分组；v1 只在明确的弃用策略下变更，不能静默改变响应语义。
@@ -406,8 +409,9 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 - `SetupAlreadyCompletedException`：系统已经完成首次建账。
 - `StockDataUnavailableException`：用例无法获得可靠的股票基础资料。
 - `StockDataProviderUnavailableException`：外部资料 Adapter 的连接、协议或配置失败，由 Setup 用例转换为 `StockDataUnavailableException`。
+- `CashLedgerEntryConflictException` 和 `PortfolioTradeConflictException`：同一组合的 `source_record_id` 已存在，但请求内容不一致。
 
-外部异常不会穿透到 HTTP 响应；Host 只把稳定的 Application 异常映射为 400、409 或 503。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
+外部异常不会穿透到 HTTP 响应；所有 Application 异常携带稳定的 `error_code`，Host 将验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503，并通过 ProblemDetails 扩展返回 `error_code`。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 
 ## 12. 测试策略
 
@@ -427,4 +431,4 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 - 外部 FTShare 数据先进入 Infrastructure Adapter，再转换为 Application DTO。
 - 事实数据和建议快照按 `docs/dividend-harvest-quant-model.md` 的 canonical 字段建模。
 - 新增持久化能力先增加对应 Domain Model `class` 和 Fluent Configuration，再通过 `IUow.Get<TEntity>()` 获取通用 Repository；不要从 Host 或 AppService 直接使用 DbContext。
-- 新增业务状态代码时使用显式枚举或 `*_code` 约定，并将枚举放入所属项目的 `Enums/` 文件夹。
+- 新增业务状态代码时使用显式枚举或 `*_code` 约定；字符串代码放入 `Codes/`，真正的枚举放入所属项目的 `Enums/` 文件夹。

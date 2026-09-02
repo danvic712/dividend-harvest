@@ -3,6 +3,7 @@ using System.Text.Json;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Domain.Codes;
 using DividendHarvest.Domain.Securities;
 using DividendHarvest.Infrastructure.Contracts;
 using Microsoft.Extensions.Options;
@@ -303,8 +304,7 @@ public sealed class FtShareStockDataProvider(
         var priceObservedAt = ReadDateTimeOffset(
             marketData.Value,
             "price_observed_at",
-            "observed_at",
-            "captured_at");
+            "observed_at");
         if (closePrice is null || tradingDate is null || priceObservedAt is null)
         {
             return null;
@@ -324,7 +324,7 @@ public sealed class FtShareStockDataProvider(
             "data_quality_code",
             "quality_code");
 
-        if (sourceRecordId is null || dataSource is null || dataQualityCode is null)
+        if (sourceRecordId is null || dataSource is null)
         {
             return null;
         }
@@ -337,7 +337,7 @@ public sealed class FtShareStockDataProvider(
             priceObservedAt.Value,
             dataSource,
             sourceRecordId,
-            dataQualityCode);
+            dataQualityCode ?? DataQualityCodes.Missing);
     }
 
     private static IReadOnlyList<StockDividendData>? ParseDividendData(
@@ -439,7 +439,7 @@ public sealed class FtShareStockDataProvider(
             "record_id",
             "id");
         var dataQualityCode = ReadString(item, "data_quality_code", "quality_code")
-            ?? "valid";
+            ?? DataQualityCodes.Missing;
         if (dataAsOfDate is null || dataSource is null || sourceRecordId is null)
         {
             return null;
@@ -573,7 +573,7 @@ public sealed class FtShareStockDataProvider(
             "record_id",
             "id");
         var dataQualityCode = ReadString(item, "data_quality_code", "quality_code")
-            ?? "valid";
+            ?? DataQualityCodes.Missing;
 
         if (dividendPerShare is null
             || dividendTypeCode is null

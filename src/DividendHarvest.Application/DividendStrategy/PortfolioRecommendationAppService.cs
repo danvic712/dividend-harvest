@@ -2,6 +2,8 @@ using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.DividendModel;
+using DividendHarvest.Domain.Codes;
+using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,21 +29,19 @@ public sealed class PortfolioRecommendationAppService(
         }
 
         var budgetSummary = await budgetAppService.GetSummaryAsync(cancellationToken);
-        var parameterIds = analyses
-            .Where(analysis => analysis.ModelParameterSetId is not null)
-            .Select(analysis => analysis.ModelParameterSetId!.Value)
-            .Distinct()
-            .ToArray();
-        var parameters = parameterIds.Length == 0
-            ? []
-            : await uow.Get<ModelParameterSet>()
-                .GetQueryable(asNoTracking: true)
-                .Where(parameter => parameterIds.Contains(parameter.Id))
-                .ToListAsync(cancellationToken);
+        var currentDate = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var parameters = await uow.Get<ModelParameterSet>()
+            .GetQueryable(asNoTracking: true)
+            .Where(parameter =>
+                parameter.PortfolioId == budgetSummary.PortfolioId
+                && parameter.EffectiveFromDate <= currentDate)
+            .ToListAsync(cancellationToken);
         var parametersById = parameters.ToDictionary(parameter => parameter.Id);
         var totalPortfolioValue = analyses
             .Where(analysis => analysis.ClosePrice is not null)
             .Sum(analysis => analysis.HeldShares * analysis.ClosePrice!.Value);
+        var portfolioValuationComplete = analyses
+            .All(analysis => analysis.HeldShares <= 0 || analysis.ClosePrice is not null);
         var sectorMarketValues = Enumerable.Range(0, analyses.Count)
             .Where(index => !string.IsNullOrWhiteSpace(watchlist[index].SectorCode))
             .GroupBy(index => watchlist[index].SectorCode!, StringComparer.OrdinalIgnoreCase)
@@ -51,13 +51,15 @@ public sealed class PortfolioRecommendationAppService(
                     analyses[index].HeldShares
                     * (analyses[index].ClosePrice ?? 0m)),
                 StringComparer.OrdinalIgnoreCase);
-        var cashReserveRatio = parameters.Count == 0
-            ? 0m
-            : parameters.Max(parameter => parameter.CashReserveRatio);
-        var startingAvailableBudget = Math.Max(
-            budgetSummary.AvailableBudgetAmount
-                - totalPortfolioValue * cashReserveRatio,
-            0m);
+        var cashReserveRatio = PortfolioBudgetCalculator.CalculateCurrentCashReserveRatio(
+            parameters,
+            currentDate);
+        var startingAvailableBudget = portfolioValuationComplete
+            ? PortfolioBudgetCalculator.CalculateAvailableBudget(
+                budgetSummary.CashBalanceAmount,
+                totalPortfolioValue,
+                cashReserveRatio)
+            : 0m;
         var remainingBudget = startingAvailableBudget;
         var totalSuggestedTradeAmount = 0m;
         var totalTransactionFeeAmount = 0m;
@@ -65,7 +67,8 @@ public sealed class PortfolioRecommendationAppService(
 
         var orderedIndexes = Enumerable.Range(0, analyses.Count)
             .OrderBy(index => GetPricePriority(analyses[index].PriceZoneCode))
-            .ThenBy(index => analyses[index].DividendReliabilityCode == "passed" ? 0 : 1)
+            .ThenBy(index =>
+                analyses[index].DividendReliabilityCode == DividendReliabilityCodes.Passed ? 0 : 1)
             .ThenByDescending(index => GetTargetGap(watchlist[index].Holding))
             .ThenBy(index => index)
             .ToArray();
@@ -113,12 +116,14 @@ public sealed class PortfolioRecommendationAppService(
                     0m);
             }
             else if (IsBuyZone(priceZoneCode)
-                && analysis.ModelStatusCode == "available"
-                && analysis.DividendReliabilityCode == "passed")
+                && analysis.ModelStatusCode == ModelStatusCodes.Available
+                && analysis.DividendReliabilityCode == DividendReliabilityCodes.Passed)
             {
                 adjustedAnalysis = adjustedAnalysis with
                 {
-                    Explanation = $"{analysis.Explanation} 本期组合预算或仓位额度不足，建议股数为 0。"
+                    Explanation = !portfolioValuationComplete
+                        ? $"{analysis.Explanation} 组合中存在缺少有效收盘价的持仓，本期不生成买入建议。"
+                        : $"{analysis.Explanation} 本期组合预算或仓位额度不足，建议股数为 0。"
                 };
             }
 
@@ -140,8 +145,8 @@ public sealed class PortfolioRecommendationAppService(
     private static int GetPricePriority(string? priceZoneCode)
         => priceZoneCode switch
         {
-            "strong_buy" => 0,
-            "accumulate" => 1,
+            PriceZoneCodes.StrongBuy => 0,
+            PriceZoneCodes.Accumulate => 1,
             _ => 2
         };
 
@@ -151,5 +156,5 @@ public sealed class PortfolioRecommendationAppService(
             : Math.Max(holding.TargetShares - holding.HeldShares, 0);
 
     private static bool IsBuyZone(string priceZoneCode)
-        => priceZoneCode is "strong_buy" or "accumulate";
+        => priceZoneCode is PriceZoneCodes.StrongBuy or PriceZoneCodes.Accumulate;
 }

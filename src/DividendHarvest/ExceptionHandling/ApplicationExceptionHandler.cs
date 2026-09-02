@@ -29,6 +29,10 @@ public sealed class ApplicationExceptionHandler(
             SetupNotCompletedException => (StatusCodes.Status409Conflict, "系统尚未完成建账"),
             ModelParameterVersionAlreadyExistsException =>
                 (StatusCodes.Status409Conflict, "股票模型参数版本已存在"),
+            CashLedgerEntryConflictException =>
+                (StatusCodes.Status409Conflict, "现金流水来源记录已存在冲突"),
+            PortfolioTradeConflictException =>
+                (StatusCodes.Status409Conflict, "交易来源记录已存在冲突"),
             StockNotConfiguredException => (StatusCodes.Status404NotFound, "股票尚未配置"),
             StockMarketDataUnavailableException =>
                 (StatusCodes.Status503ServiceUnavailable, "股票行情数据暂时不可用"),
@@ -36,6 +40,8 @@ public sealed class ApplicationExceptionHandler(
                 (StatusCodes.Status503ServiceUnavailable, "股票股息数据暂时不可用"),
             StockFinancialDataUnavailableException =>
                 (StatusCodes.Status503ServiceUnavailable, "股票财务数据暂时不可用"),
+            StockDataProviderUnavailableException =>
+                (StatusCodes.Status503ServiceUnavailable, "股票数据提供方暂时不可用"),
             StockDataUnavailableException => (StatusCodes.Status503ServiceUnavailable, "股票基础资料不可用"),
             _ => ((int StatusCode, string Title)?)null
         };
@@ -46,8 +52,9 @@ public sealed class ApplicationExceptionHandler(
         }
 
         logger.LogWarning(
-            "Application request failed with status code {StatusCode}.",
-            mapping.Value.StatusCode);
+            "Application request failed with status code {StatusCode} and error code {ErrorCode}.",
+            mapping.Value.StatusCode,
+            (exception as ApplicationExceptionBase)?.ErrorCode);
 
         httpContext.Response.StatusCode = mapping.Value.StatusCode;
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
@@ -58,8 +65,23 @@ public sealed class ApplicationExceptionHandler(
             {
                 Status = mapping.Value.StatusCode,
                 Title = mapping.Value.Title,
-                Detail = exception.Message
+                Detail = GetPublicDetail(exception, mapping.Value.Title),
+                Extensions =
+                {
+                    ["error_code"] = (exception as ApplicationExceptionBase)?.ErrorCode
+                }
             }
         });
     }
+
+    private static string GetPublicDetail(Exception exception, string fallback)
+        => exception is ApplicationValidationException
+            or SetupAlreadyCompletedException
+            or SetupNotCompletedException
+            or ModelParameterVersionAlreadyExistsException
+            or CashLedgerEntryConflictException
+            or PortfolioTradeConflictException
+            or StockNotConfiguredException
+            ? exception.Message
+            : fallback;
 }

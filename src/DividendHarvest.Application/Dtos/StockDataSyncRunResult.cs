@@ -2,7 +2,7 @@ namespace DividendHarvest.Application.Dtos;
 
 public sealed record StockDataSyncRunResult(
     int AttemptedStockCount,
-    int CompletedStockCount,
-    int FailedStockCount,
+    int FullyCompletedStockCount,
+    int PartiallyFailedStockCount,
     IReadOnlyList<StockDataSyncFailure> Failures,
     DateTimeOffset CompletedAt);
