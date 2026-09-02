@@ -9,6 +9,7 @@ using DividendHarvest.Application.Validators;
 using DividendHarvest.Application.ModelParameters;
 using DividendHarvest.Application.PriceObservations;
 using DividendHarvest.Application.Recommendations;
+using DividendHarvest.Application.Trades;
 using DividendHarvest.Background;
 using DividendHarvest.Configuration;
 using DividendHarvest.Application.Watchlist;
@@ -45,6 +46,7 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IRecommendationSnapshotAppService,
     RecommendationSnapshotAppService>();
+builder.Services.AddScoped<IPortfolioTradeAppService, PortfolioTradeAppService>();
 builder.Services.AddScoped<
     IStockDailyDataSyncAppService,
     StockDailyDataSyncAppService>();

@@ -1,0 +1,218 @@
+using System.Linq.Expressions;
+using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Dtos;
+using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Trades;
+using DividendHarvest.Application.Validators;
+using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Models;
+using Moq;
+using Xunit;
+
+namespace DividendHarvest.Application.Tests;
+
+public sealed class PortfolioTradeAppServiceTests
+{
+    [Fact]
+    public async Task RecordAsync_buy_creates_position_updates_cost_and_records_cash()
+    {
+        var portfolio = CreatePortfolio();
+        var security = CreateSecurity();
+        var portfolioRepository = CreateRepository([portfolio]);
+        var securityRepository = CreateRepository([security]);
+        var positionRepository = CreateRepository<PortfolioPosition>([]);
+        var tradeRepository = CreateRepository<PortfolioTrade>([]);
+        var cashRepository = CreateRepository<CashLedgerEntry>([]);
+        SetupAdd(positionRepository);
+        SetupAdd(tradeRepository);
+        SetupAdd(cashRepository);
+        var unitOfWork = CreateUnitOfWork(
+            portfolioRepository,
+            securityRepository,
+            positionRepository,
+            tradeRepository,
+            cashRepository);
+        var service = CreateService(unitOfWork.Object);
+
+        var result = await service.RecordAsync(
+            new RecordPortfolioTradeRequest(
+                security.SecurityCode,
+                security.ExchangeCode,
+                new DateOnly(2026, 9, 1),
+                "buy",
+                100,
+                4m,
+                5m,
+                "trade-1"),
+            CancellationToken.None);
+
+        Assert.Equal(100, result.HeldShares);
+        Assert.Equal(0, result.CoreShares);
+        Assert.Equal(4.05m, result.AverageCostPerShare);
+        Assert.Equal(400m, result.CashAmount);
+        positionRepository.Verify(x => x.AddAsync(
+            It.Is<PortfolioPosition>(position =>
+                position.HeldShares == 100
+                && position.AverageCostPerShare == 4.05m),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+        cashRepository.Verify(x => x.AddAsync(
+            It.IsAny<CashLedgerEntry>(),
+            It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RecordAsync_sell_reduces_shares_but_preserves_average_cost()
+    {
+        var portfolio = CreatePortfolio();
+        var security = CreateSecurity();
+        var position = new PortfolioPosition
+        {
+            PortfolioId = portfolio.Id,
+            SecurityId = security.Id,
+            HeldShares = 200,
+            CoreShares = 100,
+            TargetShares = 300,
+            AverageCostPerShare = 4m
+        };
+        var positionRepository = CreateRepository([position]);
+        var tradeRepository = CreateRepository<PortfolioTrade>([]);
+        var cashRepository = CreateRepository<CashLedgerEntry>([]);
+        SetupAdd(tradeRepository);
+        SetupAdd(cashRepository);
+        var unitOfWork = CreateUnitOfWork(
+            CreateRepository([portfolio]),
+            CreateRepository([security]),
+            positionRepository,
+            tradeRepository,
+            cashRepository);
+        var service = CreateService(unitOfWork.Object);
+
+        var result = await service.RecordAsync(
+            new RecordPortfolioTradeRequest(
+                security.SecurityCode,
+                security.ExchangeCode,
+                new DateOnly(2026, 9, 1),
+                "sell",
+                100,
+                5m,
+                1m,
+                "trade-2"),
+            CancellationToken.None);
+
+        Assert.Equal(100, result.HeldShares);
+        Assert.Equal(4m, result.AverageCostPerShare);
+        Assert.Equal(500m, result.CashAmount);
+        positionRepository.Verify(x => x.AddAsync(
+            It.IsAny<PortfolioPosition>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        tradeRepository.Verify(x => x.AddAsync(
+            It.IsAny<PortfolioTrade>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RecordAsync_rejects_sell_that_breaks_core_position_without_commit()
+    {
+        var portfolio = CreatePortfolio();
+        var security = CreateSecurity();
+        var positionRepository = CreateRepository([
+            new PortfolioPosition
+            {
+                PortfolioId = portfolio.Id,
+                SecurityId = security.Id,
+                HeldShares = 200,
+                CoreShares = 100,
+                AverageCostPerShare = 4m
+            }
+        ]);
+        var tradeRepository = CreateRepository<PortfolioTrade>([]);
+        var unitOfWork = CreateUnitOfWork(
+            CreateRepository([portfolio]),
+            CreateRepository([security]),
+            positionRepository,
+            tradeRepository,
+            CreateRepository<CashLedgerEntry>([]));
+        var service = CreateService(unitOfWork.Object);
+
+        await Assert.ThrowsAsync<PortfolioTradeValidationException>(() => service.RecordAsync(
+            new RecordPortfolioTradeRequest(
+                security.SecurityCode,
+                security.ExchangeCode,
+                new DateOnly(2026, 9, 1),
+                "sell",
+                101,
+                5m,
+                0m,
+                null),
+            CancellationToken.None));
+
+        tradeRepository.Verify(x => x.AddAsync(
+            It.IsAny<PortfolioTrade>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private static PortfolioTradeAppService CreateService(IUow unitOfWork)
+        => new(unitOfWork, new RecordPortfolioTradeRequestValidator());
+
+    private static Portfolio CreatePortfolio()
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = "长期股息组合"
+        };
+
+    private static Security CreateSecurity()
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            SecurityCode = "000001",
+            ExchangeCode = "SZSE",
+            SecurityName = "平安银行",
+            MarketCode = "A-share",
+            CurrencyCode = "CNY"
+        };
+
+    private static void SetupAdd<TEntity>(Mock<IRepository<TEntity>> repository)
+        where TEntity : class
+        => repository
+            .Setup(x => x.AddAsync(
+                It.IsAny<TEntity>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+    private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(
+        IEnumerable<TEntity> entities)
+        where TEntity : class
+    {
+        var repository = new Mock<IRepository<TEntity>>();
+        repository
+            .Setup(x => x.GetQueryable(
+                It.IsAny<bool>(),
+                It.IsAny<Expression<Func<TEntity, object>>[]>()))
+            .Returns(entities.AsAsyncQueryable());
+        return repository;
+    }
+
+    private static Mock<IUow> CreateUnitOfWork(
+        Mock<IRepository<Portfolio>> portfolioRepository,
+        Mock<IRepository<Security>> securityRepository,
+        Mock<IRepository<PortfolioPosition>> positionRepository,
+        Mock<IRepository<PortfolioTrade>> tradeRepository,
+        Mock<IRepository<CashLedgerEntry>> cashRepository)
+    {
+        var unitOfWork = new Mock<IUow>();
+        unitOfWork.Setup(x => x.Get<Portfolio>()).Returns(portfolioRepository.Object);
+        unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<PortfolioPosition>())
+            .Returns(positionRepository.Object);
+        unitOfWork.Setup(x => x.Get<PortfolioTrade>()).Returns(tradeRepository.Object);
+        unitOfWork.Setup(x => x.Get<CashLedgerEntry>()).Returns(cashRepository.Object);
+        return unitOfWork;
+    }
+}

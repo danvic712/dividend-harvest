@@ -24,6 +24,8 @@ internal sealed class DividendHarvestDbContext(DbContextOptions<DividendHarvestD
 
     public DbSet<RecommendationSnapshot> RecommendationSnapshots => Set<RecommendationSnapshot>();
 
+    public DbSet<PortfolioTrade> PortfolioTrades => Set<PortfolioTrade>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DividendHarvestDbContext).Assembly);

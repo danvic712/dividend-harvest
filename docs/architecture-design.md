@@ -52,7 +52,8 @@ src/
 │   │   ├── DividendEvent.cs
 │   │   ├── FinancialSnapshot.cs
 │   │   ├── CashLedgerEntry.cs
-│   │   └── RecommendationSnapshot.cs
+│   │   ├── RecommendationSnapshot.cs
+│   │   └── PortfolioTrade.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   ├── Securities/                     # A 股标识领域规则
@@ -82,6 +83,7 @@ src/
 │   ├── Budget/                         # 组合现金流水与预算摘要
 │   ├── Recommendations/                # 多股票预算分配与建议
 │   ├── DailySync/                      # 交易日数据同步编排
+│   ├── Trades/                         # 买卖交易与持仓成本更新
 │   └── Analysis/                      # 当前股票分析结果
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
@@ -99,7 +101,8 @@ src/
     │   ├── SetupController.cs
     │   ├── StocksController.cs
     │   ├── BudgetsController.cs
-    │   └── RecommendationsController.cs
+    │   ├── RecommendationsController.cs
+    │   └── PortfolioController.cs
     ├── Background/                     # ASP.NET Core 后台调度
     │   └── DailyStockDataSyncHostedService.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
@@ -209,6 +212,7 @@ SetupAppService
 - `Configurations/FinancialSnapshotConfiguration.cs`
 - `Configurations/CashLedgerEntryConfiguration.cs`
 - `Configurations/RecommendationSnapshotConfiguration.cs`
+- `Configurations/PortfolioTradeConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -232,6 +236,8 @@ Security 0..1 ────────── * CashLedgerEntry
 Portfolio 1 ──────────── * RecommendationSnapshot
 Security 1 ───────────── * RecommendationSnapshot
 ModelParameterSet 0..1 ─ * RecommendationSnapshot
+Portfolio 1 ──────────── * PortfolioTrade
+Security 1 ───────────── * PortfolioTrade
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -315,6 +321,10 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 `IStockDailyDataSyncAppService` 按关注列表逐只编排行情、股息和财务快照同步；失败项记录股票、数据类型和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。`POST /api/stocks/sync` 提供手动触发入口。
 
 Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailySync:TimeZoneId` 调度，默认使用上海时间每日 18:00，并跳过周末；A 股法定节假日由数据源实际返回结果决定，重复快照通过事实同步用例幂等处理。生产环境可以通过 `DailySync:Enabled=false` 关闭后台调度而保留手动接口。
+
+### 8.11 交易记录与持仓成本
+
+`POST /api/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；卖出不能超过当前持股，也不能把持仓降到核心仓以下。每次交易与对应买卖现金流水、手续费流水在同一个 UoW 中提交，实际现金余额不会依赖模型股息推算。
 
 ## 9. FTShare MCP Adapter
 
