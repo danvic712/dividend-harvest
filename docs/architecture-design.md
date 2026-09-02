@@ -51,7 +51,8 @@ src/
 │   │   ├── PriceObservation.cs
 │   │   ├── DividendEvent.cs
 │   │   ├── FinancialSnapshot.cs
-│   │   └── CashLedgerEntry.cs
+│   │   ├── CashLedgerEntry.cs
+│   │   └── RecommendationSnapshot.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   ├── Securities/                     # A 股标识领域规则
@@ -67,7 +68,8 @@ src/
 │   │   ├── IStockAnalysisAppService.cs
 │   │   ├── IStockFinancialSnapshotAppService.cs
 │   │   ├── IBudgetAppService.cs
-│   │   └── IPortfolioRecommendationAppService.cs
+│   │   ├── IPortfolioRecommendationAppService.cs
+│   │   └── IRecommendationSnapshotAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
@@ -203,6 +205,7 @@ SetupAppService
 - `Configurations/DividendEventConfiguration.cs`
 - `Configurations/FinancialSnapshotConfiguration.cs`
 - `Configurations/CashLedgerEntryConfiguration.cs`
+- `Configurations/RecommendationSnapshotConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -223,6 +226,9 @@ Security 1 ───────────── * DividendEvent
 Security 1 ───────────── * FinancialSnapshot
 Portfolio 1 ──────────── * CashLedgerEntry
 Security 0..1 ────────── * CashLedgerEntry
+Portfolio 1 ──────────── * RecommendationSnapshot
+Security 1 ───────────── * RecommendationSnapshot
+ModelParameterSet 0..1 ─ * RecommendationSnapshot
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -298,6 +304,8 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 `GET /api/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的分析结果、有效模型参数和组合预算，在组合层统一分配本期可用资金。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
 
 组合建议会先扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。减仓仍保护核心仓，不占用买入预算。当前 `Security` 模型尚未保存行业字段，因此行业集中度限制暂不计算；建议接口会保留后续接入行业字段和建议快照的边界。
+
+`POST /api/recommendations/snapshots` 使用同一份组合建议生成唯一 `model_run_id`，在一个 UoW 提交中保存每只股票的 `RecommendationSnapshot`。快照保留原始数据日期、参数版本、状态、价格区域和建议数量，不覆盖行情、股息、财务或现金流水事实，便于复现和后续回放。
 
 ## 9. FTShare MCP Adapter
 

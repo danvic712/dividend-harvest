@@ -39,6 +39,9 @@ builder.Services.AddScoped<IBudgetAppService, BudgetAppService>();
 builder.Services.AddScoped<
     IPortfolioRecommendationAppService,
     PortfolioRecommendationAppService>();
+builder.Services.AddScoped<
+    IRecommendationSnapshotAppService,
+    RecommendationSnapshotAppService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services
     .AddHealthChecks()

@@ -7,7 +7,8 @@ namespace DividendHarvest.Controllers;
 [ApiController]
 [Route("api/recommendations")]
 public sealed class RecommendationsController(
-    IPortfolioRecommendationAppService portfolioRecommendationAppService)
+    IPortfolioRecommendationAppService portfolioRecommendationAppService,
+    IRecommendationSnapshotAppService recommendationSnapshotAppService)
     : ControllerBase
 {
     [HttpGet]
@@ -15,6 +16,14 @@ public sealed class RecommendationsController(
         CancellationToken cancellationToken)
     {
         var result = await portfolioRecommendationAppService.GetAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("snapshots")]
+    public async Task<ActionResult<CreateRecommendationSnapshotResult>> CreateSnapshot(
+        CancellationToken cancellationToken)
+    {
+        var result = await recommendationSnapshotAppService.CreateAsync(cancellationToken);
         return Ok(result);
     }
 }
