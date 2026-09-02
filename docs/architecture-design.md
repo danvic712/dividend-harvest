@@ -10,7 +10,7 @@ Dividend Harvest 是一个面向个人 A 股长期投资者的私人工具。后
 
 ```text
 DividendHarvest Host
-├── Application.Contracts / Dtos / Exceptions
+├── Application.Contracts / Dtos / Exceptions / Validators
 ├── Application.Setup
 └── Infrastructure
     ├── Contracts
@@ -56,6 +56,7 @@ src/
 │   │   └── IStockDataProvider.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
+│   ├── Validators/                     # FluentValidation 请求验证器
 │   └── Setup/                          # AppService 实现和用例编排
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
@@ -207,6 +208,12 @@ SetupAppService
 ```
 
 外部资料在进入实体前先被规范化为 Application DTO；DTO 通过校验后才转换为 Domain Model。任何 FTShare 失败都不会产生部分持久化写入。
+
+### 8.1 Controller 与请求验证
+
+Controller 只负责 HTTP 绑定、调用 `I*AppService` 和返回响应，不包含业务计算、数据库访问、外部调用或手写输入判断。来自 HTTP、MCP 和定时任务的请求参数在 Application 边界通过 FluentValidation 验证；验证器位于 `Application/Validators/`，并通过 Application 程序集扫描注册。
+
+FluentValidation 负责请求形状、字段范围、跨字段关系和集合重复项；Domain 仍负责不可绕过的业务不变量。验证失败转换为统一的 400 ProblemDetails，已知 Application 异常由 Host 的统一异常处理器映射为稳定的 HTTP 响应，避免在每个 Controller 中复制异常分支。
 
 ## 9. FTShare MCP Adapter
 

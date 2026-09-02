@@ -3,6 +3,7 @@ using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Setup;
+using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Securities;
@@ -51,7 +52,7 @@ public sealed class SetupAppServiceTests
         var securityRepository = new Mock<IRepository<Security>>();
         var positionRepository = new Mock<IRepository<PortfolioPosition>>();
         var unitOfWork = CreateUnitOfWork(repository, securityRepository, positionRepository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
         var request = new SetupRequest(
             "长期股息组合",
             [
@@ -98,7 +99,7 @@ public sealed class SetupAppServiceTests
         var repository = CreatePortfolioRepository(hasPortfolio: true);
         var provider = new Mock<IStockDataProvider>();
         var unitOfWork = CreateUnitOfWork(repository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
 
         await Assert.ThrowsAsync<SetupAlreadyCompletedException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
@@ -117,7 +118,7 @@ public sealed class SetupAppServiceTests
             .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StockData?)null);
         var unitOfWork = CreateUnitOfWork(repository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
 
         await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
@@ -138,7 +139,7 @@ public sealed class SetupAppServiceTests
                 "FTShare MCP 股票资料暂时不可用。",
                 new TimeoutException("FTShare MCP 请求超时。")));
         var unitOfWork = CreateUnitOfWork(repository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object);
+        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
 
         var exception = await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
@@ -149,13 +150,39 @@ public sealed class SetupAppServiceTests
         repository.Verify(x => x.AddAsync(It.IsAny<Portfolio>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task InitializeAsync_validates_request_before_checking_setup_status()
+    {
+        var repository = CreatePortfolioRepository(hasPortfolio: false);
+        var provider = new Mock<IStockDataProvider>();
+        var unitOfWork = CreateUnitOfWork(repository);
+        var service = new SetupAppService(
+            unitOfWork.Object,
+            provider.Object,
+            CreateRequestValidator());
+
+        var exception = await Assert.ThrowsAsync<SetupValidationException>(() => service.InitializeAsync(
+            new SetupRequest(" ", []),
+            CancellationToken.None));
+
+        Assert.Contains("投资组合名称必须为 1 到 100 个字符。", exception.Message);
+        unitOfWork.Verify(x => x.Get<Portfolio>(), Times.Never);
+        provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static SetupAppService CreateService(
         Mock<IRepository<Portfolio>> repository,
         Mock<IStockDataProvider>? provider = null)
     {
         var unitOfWork = CreateUnitOfWork(repository);
-        return new SetupAppService(unitOfWork.Object, (provider ?? new Mock<IStockDataProvider>()).Object);
+        return new SetupAppService(
+            unitOfWork.Object,
+            (provider ?? new Mock<IStockDataProvider>()).Object,
+            CreateRequestValidator());
     }
+
+    private static SetupRequestValidator CreateRequestValidator()
+        => new(new SetupStockRequestValidator(new InitialHoldingInputValidator()));
 
     private static Mock<IRepository<Portfolio>> CreatePortfolioRepository(bool hasPortfolio)
     {

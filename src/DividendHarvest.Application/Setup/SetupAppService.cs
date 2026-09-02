@@ -5,13 +5,15 @@ using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Setup;
 
 public sealed class SetupAppService(
     IUow uow,
-    IStockDataProvider stockDataProvider) : ISetupAppService
+    IStockDataProvider stockDataProvider,
+    IValidator<SetupRequest> requestValidator) : ISetupAppService
 {
     public async Task<SetupStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
@@ -30,6 +32,16 @@ public sealed class SetupAppService(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            throw new SetupValidationException(
+                string.Join(
+                    "；",
+                    validationResult.Errors.Select(error =>
+                        $"{error.PropertyName}: {error.ErrorMessage}")));
+        }
+
         if (await uow.Get<Portfolio>()
             .GetQueryable(asNoTracking: true)
             .AnyAsync(cancellationToken))
@@ -37,16 +49,7 @@ public sealed class SetupAppService(
             throw new SetupAlreadyCompletedException();
         }
 
-        var portfolioName = request.PortfolioName?.Trim() ?? string.Empty;
-        if (portfolioName.Length is < 1 or > 100)
-        {
-            throw new SetupValidationException("投资组合名称必须为 1 到 100 个字符。");
-        }
-
-        if (request.Stocks is null || request.Stocks.Count == 0)
-        {
-            throw new SetupValidationException("至少需要配置一只 A 股股票。");
-        }
+        var portfolioName = request.PortfolioName.Trim();
 
         var references = request.Stocks
             .Select(stock =>
@@ -61,11 +64,6 @@ public sealed class SetupAppService(
                 }
             })
             .ToArray();
-
-        if (references.Distinct().Count() != references.Length)
-        {
-            throw new SetupValidationException("不能重复配置同一只股票。");
-        }
 
         var portfolioId = Guid.NewGuid();
         var resolvedStocks = new List<ResolvedStock>(request.Stocks.Count);

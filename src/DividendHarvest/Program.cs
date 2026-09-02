@@ -1,15 +1,20 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Setup;
+using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.ExceptionHandling;
 using DividendHarvest.Infrastructure;
 using DividendHarvest.HealthChecks;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using FluentValidation;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApplicationExceptionHandler>();
 builder.Services.AddControllers();
+builder.Services.AddValidatorsFromAssemblyContaining<SetupRequestValidator>();
 builder.Services
     .AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
