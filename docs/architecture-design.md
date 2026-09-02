@@ -433,7 +433,7 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 
 Host 的 `ApplicationExceptionHandler` 只负责把错误目录解析出的结果写成 ProblemDetails：验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503，并通过扩展返回 `error_code` 和 `locale`。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；内部日志仍可通过结构化日志记录稳定错误码和状态。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 
-新增 Application 异常时，必须同时在每个受支持语言的对应领域 JSON 中定义相同的错误码，并补充 Application 单元测试；缺少定义、重复定义、非法状态码或空文本应在目录加载时直接失败，而不是运行到请求时才产生隐性回退。
+新增 Application 异常时，必须同时使用 `ApplicationErrorCodeAttribute` 声明稳定错误码、在每个受支持语言的对应领域 JSON 中定义该错误码，并补充 Application 单元测试；缺少异常声明、缺少定义、重复定义、跨语言状态码/占位符不一致、非法状态码或空文本应在目录加载时直接失败，而不是运行到请求时才产生隐性回退。
 
 ## 12. 测试策略
 
