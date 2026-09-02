@@ -9,6 +9,7 @@ public sealed class StockDailyDataSyncAppService(
     IStockPriceObservationAppService stockPriceObservationAppService,
     IStockDividendEventAppService stockDividendEventAppService,
     IStockFinancialSnapshotAppService stockFinancialSnapshotAppService,
+    IApplicationErrorCatalog applicationErrorCatalog,
     TimeProvider timeProvider) : IStockDailyDataSyncAppService
 {
     public async Task<StockDataSyncRunResult> SyncAsync(
@@ -32,6 +33,7 @@ public sealed class StockDailyDataSyncAppService(
                     request,
                     cancellationToken),
                 failures,
+                applicationErrorCatalog,
                 cancellationToken);
             await TrySyncAsync(
                 stock,
@@ -42,6 +44,7 @@ public sealed class StockDailyDataSyncAppService(
                         stock.ExchangeCode),
                     cancellationToken),
                 failures,
+                applicationErrorCatalog,
                 cancellationToken);
             await TrySyncAsync(
                 stock,
@@ -52,6 +55,7 @@ public sealed class StockDailyDataSyncAppService(
                         stock.ExchangeCode),
                     cancellationToken),
                 failures,
+                applicationErrorCatalog,
                 cancellationToken);
 
             if (failures.Count == stockFailuresBeforeSync)
@@ -76,6 +80,7 @@ public sealed class StockDailyDataSyncAppService(
         string dataKind,
         Func<Task> sync,
         ICollection<StockDataSyncFailure> failures,
+        IApplicationErrorCatalog applicationErrorCatalog,
         CancellationToken cancellationToken)
     {
         try
@@ -88,12 +93,15 @@ public sealed class StockDailyDataSyncAppService(
         }
         catch (Exception exception) when (IsExpectedSyncFailure(exception))
         {
+            var detail = exception is ApplicationExceptionBase applicationException
+                ? applicationErrorCatalog.Resolve(applicationException).Detail
+                : exception.Message;
             failures.Add(new StockDataSyncFailure(
                 stock.SecurityCode,
                 stock.ExchangeCode,
                 dataKind,
                 (exception as ApplicationExceptionBase)?.ErrorCode ?? "stock_data_sync_failed",
-                exception.Message));
+                detail));
         }
     }
 

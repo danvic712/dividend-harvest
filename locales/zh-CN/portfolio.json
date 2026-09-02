@@ -1,0 +1,22 @@
+{
+  "budget_validation_failed": {
+    "status_code": 400,
+    "title": "预算流水请求无效",
+    "detail": "{message}"
+  },
+  "cash_ledger_entry_conflict": {
+    "status_code": 409,
+    "title": "现金流水来源记录已存在冲突",
+    "detail": "现金流水来源记录标识 {sourceRecordId} 已被其他流水使用。"
+  },
+  "portfolio_trade_validation_failed": {
+    "status_code": 400,
+    "title": "交易记录无效",
+    "detail": "{message}"
+  },
+  "portfolio_trade_conflict": {
+    "status_code": 409,
+    "title": "交易来源记录已存在冲突",
+    "detail": "交易来源记录标识 {sourceRecordId} 已被其他交易使用。"
+  }
+}

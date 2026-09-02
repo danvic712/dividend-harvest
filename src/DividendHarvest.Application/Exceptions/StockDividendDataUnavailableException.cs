@@ -5,5 +5,8 @@ public sealed class StockDividendDataUnavailableException(
     Exception? innerException = null)
     : ApplicationExceptionBase(
         "stock_dividend_data_unavailable",
-        $"股票 {securityCode} 的股息数据暂时不可用。",
+        new Dictionary<string, object?>
+        {
+            ["securityCode"] = securityCode
+        },
         innerException);

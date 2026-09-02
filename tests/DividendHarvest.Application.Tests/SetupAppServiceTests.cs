@@ -166,7 +166,9 @@ public sealed class SetupAppServiceTests
             new SetupRequest(" ", []),
             CancellationToken.None));
 
-        Assert.Contains("投资组合名称必须为 1 到 100 个字符。", exception.Message);
+        Assert.Contains(
+            "投资组合名称必须为 1 到 100 个字符。",
+            exception.Parameters["message"]?.ToString());
         unitOfWork.Verify(x => x.Get<PortfolioEntity>(), Times.Never);
         provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
     }

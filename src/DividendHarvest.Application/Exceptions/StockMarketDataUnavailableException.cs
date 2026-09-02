@@ -5,5 +5,8 @@ public sealed class StockMarketDataUnavailableException(
     Exception? innerException = null)
     : ApplicationExceptionBase(
         "stock_market_data_unavailable",
-        $"股票 {securityCode} 的行情数据暂时不可用。",
+        new Dictionary<string, object?>
+        {
+            ["securityCode"] = securityCode
+        },
         innerException);

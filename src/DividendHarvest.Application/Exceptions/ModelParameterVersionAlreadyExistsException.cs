@@ -5,4 +5,8 @@ public sealed class ModelParameterVersionAlreadyExistsException(
     DateOnly effectiveFromDate)
     : ApplicationExceptionBase(
         "model_parameter_version_already_exists",
-        $"股票 {securityCode} 已存在生效日期为 {effectiveFromDate:yyyy-MM-dd} 的模型参数版本。");
+        new Dictionary<string, object?>
+        {
+            ["securityCode"] = securityCode,
+            ["effectiveFromDate"] = effectiveFromDate
+        });

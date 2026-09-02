@@ -1,0 +1,17 @@
+{
+  "model_parameter_validation_failed": {
+    "status_code": 400,
+    "title": "股票模型参数无效",
+    "detail": "{message}"
+  },
+  "model_parameter_version_already_exists": {
+    "status_code": 409,
+    "title": "股票模型参数版本已存在",
+    "detail": "股票 {securityCode} 已存在生效日期为 {effectiveFromDate} 的模型参数版本。"
+  },
+  "stock_analysis_validation_failed": {
+    "status_code": 400,
+    "title": "股票分析请求无效",
+    "detail": "{message}"
+  }
+}

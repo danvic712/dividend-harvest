@@ -16,4 +16,9 @@
   <ItemGroup>
     <ProjectReference Include="../DividendHarvest.Domain/DividendHarvest.Domain.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="../../locales/**/*.json"
+                      Link="locales/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

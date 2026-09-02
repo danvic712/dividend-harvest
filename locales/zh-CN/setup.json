@@ -1,0 +1,17 @@
+{
+  "setup_validation_failed": {
+    "status_code": 400,
+    "title": "建账请求无效",
+    "detail": "{message}"
+  },
+  "setup_already_completed": {
+    "status_code": 409,
+    "title": "系统已经完成建账",
+    "detail": "系统已经完成首次建账，不能重复初始化。"
+  },
+  "setup_not_completed": {
+    "status_code": 409,
+    "title": "系统尚未完成建账",
+    "detail": "请先完成首次建账，再配置股票模型参数。"
+  }
+}

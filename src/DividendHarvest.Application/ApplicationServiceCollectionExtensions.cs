@@ -1,5 +1,6 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.DividendStrategy;
+using DividendHarvest.Application.Localization;
 using DividendHarvest.Application.Portfolio;
 using DividendHarvest.Application.Setup;
 using DividendHarvest.Application.Stocks;
@@ -27,6 +28,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IRecommendationSnapshotAppService, RecommendationSnapshotAppService>();
         services.AddScoped<IPortfolioTradeAppService, PortfolioTradeAppService>();
         services.AddScoped<IStockDailyDataSyncAppService, StockDailyDataSyncAppService>();
+        services.AddSingleton<IApplicationErrorCatalog, ApplicationErrorCatalog>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

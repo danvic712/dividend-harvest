@@ -2,6 +2,7 @@ using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Stocks;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Localization;
 using Moq;
 using Xunit;
 
@@ -146,6 +147,7 @@ public sealed class StockDailyDataSyncAppServiceTests
         var failure = Assert.Single(result.Failures);
         Assert.Equal("price", failure.DataKind);
         Assert.Equal("stock_market_data_unavailable", failure.ErrorCode);
+        Assert.Contains("行情数据", failure.FailureMessage);
         dividends.Verify(x => x.SyncAsync(
             It.IsAny<SyncStockDividendsRequest>(),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -164,6 +166,7 @@ public sealed class StockDailyDataSyncAppServiceTests
             prices,
             dividends,
             financials,
+            new ApplicationErrorCatalog(),
             new FixedTimeProvider(
                 new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero)));
 

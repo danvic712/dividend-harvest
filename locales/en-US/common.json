@@ -1,0 +1,7 @@
+{
+  "application_error_unknown": {
+    "status_code": 500,
+    "title": "The request could not be processed",
+    "detail": "The request could not be processed. Please try again later."
+  }
+}

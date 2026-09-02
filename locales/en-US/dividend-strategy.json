@@ -1,0 +1,17 @@
+{
+  "model_parameter_validation_failed": {
+    "status_code": 400,
+    "title": "The stock model parameters are invalid",
+    "detail": "{message}"
+  },
+  "model_parameter_version_already_exists": {
+    "status_code": 409,
+    "title": "The stock model parameter version already exists",
+    "detail": "A model parameter version for stock {securityCode} already exists for effective date {effectiveFromDate}."
+  },
+  "stock_analysis_validation_failed": {
+    "status_code": 400,
+    "title": "The stock analysis request is invalid",
+    "detail": "{message}"
+  }
+}

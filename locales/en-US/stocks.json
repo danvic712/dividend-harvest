@@ -1,0 +1,37 @@
+{
+  "stock_data_sync_validation_failed": {
+    "status_code": 400,
+    "title": "The stock synchronization request is invalid",
+    "detail": "{message}"
+  },
+  "stock_data_provider_unavailable": {
+    "status_code": 503,
+    "title": "The stock data provider is temporarily unavailable",
+    "detail": "The stock data provider is temporarily unavailable. Please try again later."
+  },
+  "stock_data_unavailable": {
+    "status_code": 503,
+    "title": "Stock reference data is temporarily unavailable",
+    "detail": "Reference data for stock {securityCode} is temporarily unavailable."
+  },
+  "stock_market_data_unavailable": {
+    "status_code": 503,
+    "title": "Stock market data is temporarily unavailable",
+    "detail": "Market data for stock {securityCode} is temporarily unavailable."
+  },
+  "stock_dividend_data_unavailable": {
+    "status_code": 503,
+    "title": "Stock dividend data is temporarily unavailable",
+    "detail": "Dividend data for stock {securityCode} is temporarily unavailable."
+  },
+  "stock_financial_data_unavailable": {
+    "status_code": 503,
+    "title": "Stock financial data is temporarily unavailable",
+    "detail": "Financial data for stock {securityCode} is temporarily unavailable."
+  },
+  "stock_not_configured": {
+    "status_code": 404,
+    "title": "Stock is not configured",
+    "detail": "Stock {securityCode} ({exchangeCode}) is not configured in the watchlist."
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "stock_data_sync_validation_failed": {
+    "status_code": 400,
+    "title": "股票同步请求无效",
+    "detail": "{message}"
+  },
+  "stock_data_provider_unavailable": {
+    "status_code": 503,
+    "title": "股票数据提供方暂时不可用",
+    "detail": "股票数据提供方暂时不可用，请稍后重试。"
+  },
+  "stock_data_unavailable": {
+    "status_code": 503,
+    "title": "股票基础资料暂时不可用",
+    "detail": "股票 {securityCode} 的基础资料暂时不可用。"
+  },
+  "stock_market_data_unavailable": {
+    "status_code": 503,
+    "title": "股票行情数据暂时不可用",
+    "detail": "股票 {securityCode} 的行情数据暂时不可用。"
+  },
+  "stock_dividend_data_unavailable": {
+    "status_code": 503,
+    "title": "股票股息数据暂时不可用",
+    "detail": "股票 {securityCode} 的股息数据暂时不可用。"
+  },
+  "stock_financial_data_unavailable": {
+    "status_code": 503,
+    "title": "股票财务数据暂时不可用",
+    "detail": "股票 {securityCode} 的财务数据暂时不可用。"
+  },
+  "stock_not_configured": {
+    "status_code": 404,
+    "title": "股票尚未配置",
+    "detail": "股票 {securityCode}（{exchangeCode}）尚未配置到关注列表。"
+  }
+}

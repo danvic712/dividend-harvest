@@ -5,5 +5,8 @@ public sealed class StockFinancialDataUnavailableException(
     Exception? innerException = null)
     : ApplicationExceptionBase(
         "stock_financial_data_unavailable",
-        $"股票 {securityCode} 的财务数据暂时不可用。",
+        new Dictionary<string, object?>
+        {
+            ["securityCode"] = securityCode
+        },
         innerException);

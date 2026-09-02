@@ -1,0 +1,7 @@
+{
+  "application_error_unknown": {
+    "status_code": 500,
+    "title": "系统暂时无法处理请求",
+    "detail": "系统暂时无法处理请求，请稍后重试。"
+  }
+}

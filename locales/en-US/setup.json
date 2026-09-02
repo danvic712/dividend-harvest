@@ -1,0 +1,17 @@
+{
+  "setup_validation_failed": {
+    "status_code": 400,
+    "title": "The setup request is invalid",
+    "detail": "{message}"
+  },
+  "setup_already_completed": {
+    "status_code": 409,
+    "title": "Setup already completed",
+    "detail": "The system has completed initial setup and cannot be initialized again."
+  },
+  "setup_not_completed": {
+    "status_code": 409,
+    "title": "Setup has not been completed",
+    "detail": "Complete initial setup before configuring stock model parameters."
+  }
+}
