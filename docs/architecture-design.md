@@ -2,7 +2,7 @@
 
 ## 1. 目标与边界
 
-Dividend Harvest 是一个面向个人 A 股长期投资者的私人工具。后端使用 ASP.NET Core Minimal API，前端和后端最终由同一个 Host 镜像提供。后端负责持久化用户的组合、持仓、交易和模型数据，并通过 FTShare MCP Adapter 获取外部股票资料、行情、股息和财务数据。
+Dividend Harvest 是一个面向个人 A 股长期投资者的私人工具。后端使用 ASP.NET Core Controllers，前端和后端最终由同一个 Host 镜像提供。后端负责持久化用户的组合、持仓、交易和模型数据，并通过 FTShare MCP Adapter 获取外部股票资料、行情、股息和财务数据。
 
 系统只提供可解释的参考结果，不执行交易，也不把外部数据源当作用户持仓或交易记录的归属地。
 
@@ -10,7 +10,7 @@ Dividend Harvest 是一个面向个人 A 股长期投资者的私人工具。后
 
 ```text
 DividendHarvest Host
-├── Application.Contracts / Dto / Exceptions
+├── Application.Contracts / Dtos / Exceptions
 ├── Application.Setup
 └── Infrastructure
     ├── Contracts
@@ -45,7 +45,7 @@ src/
 │   ├── Contracts/                      # Application 对外 Interface
 │   │   ├── ISetupAppService.cs
 │   │   └── IStockDataProvider.cs
-│   ├── Dto/                            # 所有 Application DTO
+│   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   └── Setup/                          # AppService 实现和用例编排
 ├── DividendHarvest.Infrastructure/
@@ -57,13 +57,15 @@ src/
 │   │   └── EFUow.cs
 │   ├── DividendHarvestDbContext.cs     # EF Core DbContext
 │   └── FtShare/                        # FTShare MCP Adapter 实现
-└── DividendHarvest/                    # ASP.NET Core Minimal API Host
+└── DividendHarvest/                    # ASP.NET Core Controllers Host
+    ├── Controllers/                    # 业务 HTTP Controller
+    └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
 约束：
 
 1. 本项目声明的所有 Interface 必须位于所属项目的 `Contracts/` 文件夹；一个文件只放一个 Interface。
-2. 所有 DTO 必须位于 `Dto/` 文件夹；一个 DTO 文件只允许包含一个 DTO class/record。
+2. 所有 DTO 必须位于 `Dtos/` 文件夹；一个 DTO 文件只允许包含一个 DTO class/record。
 3. 所有自定义 Exception 必须位于 `Exceptions/` 文件夹；一个文件只放一个 Exception。
 4. 如果新增枚举，必须放到所属项目的 `Enums/` 文件夹；当前代码没有枚举，不创建空的伪实现。
 5. `Application` 的业务实现类使用 `*AppService` 后缀；对应 Interface 使用 `I*AppService`。
@@ -81,7 +83,7 @@ Application 不认识 EF Core、SQLite、HTTP 或 MCP SDK。Host 只依赖 Appli
 
 ### 4.2 DTO
 
-Application 的 DTO 位于 `Application/Dto/`，用于 Minimal API 与用例之间的输入输出，以及外部资料 Adapter 规范化后的结果。DTO 不承担数据库实体职责，也不包含 Repository、DbContext 或 MCP 客户端。
+Application 的 DTO 位于 `Application/Dtos/`，用于 Controller 与用例之间的输入输出，以及外部资料 Adapter 规范化后的结果。DTO 不承担数据库实体职责，也不包含 Repository、DbContext 或 MCP 客户端。
 
 一个 DTO 文件只能包含一个 DTO 类型，文件名必须与类型名一致。
 
@@ -146,7 +148,8 @@ SetupAppService
 - `EFRepository<TEntity>` 只包装 `DbContext.Set<TEntity>()`，负责查询、包含、添加和删除。
 - `EFUow.CommitAsync` 统一调用 `SaveChangesAsync`；一个用例的多个实体写入在一次提交中完成。
 - `DividendHarvestDbContext` 位于 Infrastructure 根目录；`EFRepository<TEntity>` 和 `EFUow` 位于 `Infrastructure/Repositories/`，均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
-- Host 的 `/readyz` 和启动建库也只能通过 `IUow.CanConnectAsync`、`IUow.EnsureCreatedAsync`，不直接解析 DbContext。
+- Host 的 `/healthz`、`/readyz` 使用 ASP.NET Core 原生 Health Checks；数据库健康检查通过 `IUow.CanConnectAsync` 实现。
+- Host 的启动建库只能通过 `IUow.EnsureCreatedAsync`，不直接解析 DbContext。
 - 数据库通过 Docker volume 持久化到 `/app/data`；镜像本身不保存用户数据。
 
 ## 6. Domain Models 与 Fluent 配置
@@ -179,7 +182,7 @@ Portfolio 1 ───────────── * PortfolioPosition * ──
 首次建账的调用路径如下：
 
 ```text
-HTTP POST /api/setup
+Controller POST /api/setup
         │
         ▼
 ISetupAppService

@@ -1,4 +1,4 @@
-using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Dtos;
 using DividendHarvest.Domain.Securities;
 
 namespace DividendHarvest.Application.Contracts;

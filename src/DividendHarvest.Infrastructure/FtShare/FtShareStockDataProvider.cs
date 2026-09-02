@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DividendHarvest.Application.Contracts;
-using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Domain.Securities;
 using DividendHarvest.Infrastructure.Contracts;

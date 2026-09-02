@@ -1,5 +1,5 @@
 using DividendHarvest.Application.Contracts;
-using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;

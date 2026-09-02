@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
-using DividendHarvest.Application.Dto;
+using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Setup;
 using DividendHarvest.Domain.Contracts;

@@ -1,4 +1,4 @@
-namespace DividendHarvest.Application.Dto;
+namespace DividendHarvest.Application.Dtos;
 
 public sealed record InitialHoldingInput(
     int HeldShares,
