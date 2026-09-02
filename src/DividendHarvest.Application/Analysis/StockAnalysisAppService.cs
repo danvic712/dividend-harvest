@@ -69,7 +69,9 @@ public sealed class StockAnalysisAppService(
         var position = await uow.Get<PortfolioPosition>()
             .GetQueryable(asNoTracking: true)
             .FirstOrDefaultAsync(
-                currentPosition => currentPosition.SecurityId == security.Id,
+                currentPosition => currentPosition.SecurityId == security.Id
+                    && (parameters == null
+                        || currentPosition.PortfolioId == parameters.PortfolioId),
                 cancellationToken);
 
         var heldShares = position?.HeldShares ?? 0;
@@ -104,10 +106,40 @@ public sealed class StockAnalysisAppService(
                 computedAt);
         }
 
-        var priceZone = DividendPriceZoneCalculator.Calculate(
-            parameters,
-            modelDividendPerShare.Value,
-            priceObservation.ClosePrice);
+        var cashEntries = await uow.Get<CashLedgerEntry>()
+            .GetQueryable(asNoTracking: true)
+            .Where(entry => entry.PortfolioId == parameters.PortfolioId)
+            .ToListAsync(cancellationToken);
+        var ledgerBalance = cashEntries
+            .Where(entry => entry.CashDirectionCode == "inflow")
+            .Sum(entry => entry.CashAmount)
+            - cashEntries
+                .Where(entry => entry.CashDirectionCode == "outflow")
+                .Sum(entry => entry.CashAmount);
+        var portfolioPositions = await uow.Get<PortfolioPosition>()
+            .GetQueryable(asNoTracking: true)
+            .Where(currentPosition => currentPosition.PortfolioId == parameters.PortfolioId)
+            .ToListAsync(cancellationToken);
+        var portfolioPriceObservations = await uow.Get<PriceObservation>()
+            .GetQueryable(asNoTracking: true)
+            .Where(observation => observation.TradingDate <= currentDate)
+            .ToListAsync(cancellationToken);
+        var latestPrices = portfolioPriceObservations
+            .GroupBy(observation => observation.SecurityId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(observation => observation.TradingDate)
+                    .First());
+        var totalPortfolioValue = portfolioPositions
+            .Where(currentPosition => latestPrices.ContainsKey(currentPosition.SecurityId))
+            .Sum(currentPosition =>
+                currentPosition.HeldShares
+                * latestPrices[currentPosition.SecurityId].ClosePrice);
+        var availableBudgetAmount = Math.Max(
+            ledgerBalance
+                - totalPortfolioValue * parameters.CashReserveRatio,
+            0m);
         var modelStatusCode = reliabilityCode switch
         {
             "passed" => "available",
@@ -115,9 +147,27 @@ public sealed class StockAnalysisAppService(
             "re_evaluate" => "re_evaluate",
             _ => "cautious"
         };
+        var priceZone = DividendPriceZoneCalculator.Calculate(
+            parameters,
+            modelDividendPerShare.Value,
+            priceObservation.ClosePrice);
         var recommendationCode = reliabilityCode == "passed"
             ? priceZone.PriceZoneCode
             : "no_action";
+        var tradeQuantity = TradeQuantityCalculator.Calculate(
+            parameters,
+            modelStatusCode,
+            reliabilityCode,
+            priceZone.PriceZoneCode,
+            priceObservation.ClosePrice,
+            heldShares,
+            coreShares,
+            position?.TargetShares ?? 0,
+            availableBudgetAmount,
+            totalPortfolioValue > 0 ? totalPortfolioValue : null,
+            position is null
+                ? 0m
+                : position.HeldShares * priceObservation.ClosePrice);
         var explanation = reliabilityCode == "passed"
             ? "股息可靠性检查通过，当前价格区域可用于生成后续预算建议。"
             : "TTM 股息率和价格区域已计算，但股息可靠性资料尚未完整，当前只提供谨慎参考。";
@@ -141,9 +191,9 @@ public sealed class StockAnalysisAppService(
             heldShares,
             coreShares,
             satelliteShares,
-            0,
-            0,
-            0m,
+            tradeQuantity.SuggestedBuyShares,
+            tradeQuantity.SuggestedSellShares,
+            tradeQuantity.SuggestedTradeAmount,
             priceObservation.TradingDate,
             parameters.Id,
             computedAt,

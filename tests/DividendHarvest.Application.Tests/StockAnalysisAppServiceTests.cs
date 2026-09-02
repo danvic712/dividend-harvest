@@ -186,7 +186,17 @@ public sealed class StockAnalysisAppServiceTests
             CreateRepository([priceObservation]),
             CreateRepository(dividendEvents),
             CreateRepository([financialSnapshot]),
-            CreateRepository<PortfolioPosition>([]));
+            CreateRepository<PortfolioPosition>([]),
+            CreateRepository([
+                CashLedgerEntry.Create(
+                    portfolio.Id,
+                    null,
+                    new DateOnly(2026, 8, 1),
+                    "budget_deposit",
+                    "inflow",
+                    5000m,
+                    "deposit-1")
+            ]));
         var service = CreateService(unitOfWork.Object);
 
         var result = await service.GetAsync(
@@ -197,6 +207,8 @@ public sealed class StockAnalysisAppServiceTests
         Assert.Equal("passed", result.DividendReliabilityCode);
         Assert.Equal("strong_buy", result.PriceZoneCode);
         Assert.Equal("strong_buy", result.RecommendationCode);
+        Assert.Equal(200, result.SuggestedBuyShares);
+        Assert.Equal(800m, result.SuggestedTradeAmount);
     }
 
     [Fact]
@@ -295,7 +307,8 @@ public sealed class StockAnalysisAppServiceTests
         Mock<IRepository<PriceObservation>> priceRepository,
         Mock<IRepository<DividendEvent>> dividendRepository,
         Mock<IRepository<FinancialSnapshot>> financialRepository,
-        Mock<IRepository<PortfolioPosition>> positionRepository)
+        Mock<IRepository<PortfolioPosition>> positionRepository,
+        Mock<IRepository<CashLedgerEntry>>? cashLedgerRepository = null)
     {
         var unitOfWork = new Mock<IUow>();
         unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
@@ -314,6 +327,9 @@ public sealed class StockAnalysisAppServiceTests
         unitOfWork
             .Setup(x => x.Get<PortfolioPosition>())
             .Returns(positionRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<CashLedgerEntry>())
+            .Returns((cashLedgerRepository ?? CreateRepository<CashLedgerEntry>([])).Object);
         return unitOfWork;
     }
 

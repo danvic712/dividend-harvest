@@ -288,7 +288,7 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 `GET /api/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
 
-分析结果明确区分 `unavailable`、`cautious` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。买入预算、交易单位、核心仓保护和建议快照将在后续 Application 功能中接入。
+分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序、集中度竞争和建议快照仍需组合级用例统一处理。
 
 ## 9. FTShare MCP Adapter
 
