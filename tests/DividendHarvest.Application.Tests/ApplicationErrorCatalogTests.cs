@@ -38,6 +38,27 @@ public sealed class ApplicationErrorCatalogTests
     }
 
     [Fact]
+    public void Resolve_uses_the_highest_quality_supported_language()
+    {
+        var localized = catalog.Resolve(
+            new SetupAlreadyCompletedException(),
+            "zh-CN;q=0.1,en-US;q=0.9");
+
+        Assert.Equal("en-US", localized.CultureName);
+    }
+
+    [Fact]
+    public void Resolve_does_not_mix_chinese_validation_text_into_english_response()
+    {
+        var localized = catalog.Resolve(
+            new SetupValidationException("投资组合名称必须为 1 到 100 个字符。"),
+            "en-US");
+
+        Assert.Contains("Please review", localized.Detail);
+        Assert.DoesNotContain("投资组合名称", localized.Detail);
+    }
+
+    [Fact]
     public void Resolve_uses_default_locale_for_an_unsupported_accept_language()
     {
         var localized = catalog.Resolve(
@@ -74,7 +95,7 @@ public sealed class ApplicationErrorCatalogTests
             new ModelParameterVersionAlreadyExistsException("000001", new DateOnly(2026, 9, 3)),
             new StockAnalysisValidationException("validation"),
             new StockDataSyncValidationException("validation"),
-            new StockDataProviderUnavailableException("provider", new TimeoutException()),
+            new StockDataProviderUnavailableException(new TimeoutException()),
             new StockDataUnavailableException("000001"),
             new StockMarketDataUnavailableException("000001"),
             new StockDividendDataUnavailableException("000001"),

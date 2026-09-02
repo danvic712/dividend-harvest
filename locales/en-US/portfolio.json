@@ -2,7 +2,8 @@
   "budget_validation_failed": {
     "status_code": 400,
     "title": "The budget ledger request is invalid",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": "Please review the budget ledger request fields and try again."
   },
   "cash_ledger_entry_conflict": {
     "status_code": 409,
@@ -12,7 +13,8 @@
   "portfolio_trade_validation_failed": {
     "status_code": 400,
     "title": "The portfolio trade is invalid",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": "Please review the portfolio trade request fields and try again."
   },
   "portfolio_trade_conflict": {
     "status_code": 409,

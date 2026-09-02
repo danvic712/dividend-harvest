@@ -2,7 +2,8 @@
   "stock_data_sync_validation_failed": {
     "status_code": 400,
     "title": "The stock synchronization request is invalid",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": "Please review the stock synchronization request fields and try again."
   },
   "stock_data_provider_unavailable": {
     "status_code": 503,

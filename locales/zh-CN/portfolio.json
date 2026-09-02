@@ -2,7 +2,8 @@
   "budget_validation_failed": {
     "status_code": 400,
     "title": "预算流水请求无效",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": null
   },
   "cash_ledger_entry_conflict": {
     "status_code": 409,
@@ -12,7 +13,8 @@
   "portfolio_trade_validation_failed": {
     "status_code": 400,
     "title": "交易记录无效",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": null
   },
   "portfolio_trade_conflict": {
     "status_code": 409,

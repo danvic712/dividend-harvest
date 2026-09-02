@@ -2,7 +2,8 @@
   "stock_data_sync_validation_failed": {
     "status_code": 400,
     "title": "股票同步请求无效",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": null
   },
   "stock_data_provider_unavailable": {
     "status_code": 503,

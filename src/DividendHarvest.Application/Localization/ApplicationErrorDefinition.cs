@@ -12,4 +12,7 @@ internal sealed class ApplicationErrorDefinition
 
     [JsonPropertyName("detail")]
     public string Detail { get; init; } = string.Empty;
+
+    [JsonPropertyName("validation_message")]
+    public string? ValidationMessage { get; init; }
 }

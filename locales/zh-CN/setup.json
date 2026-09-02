@@ -2,7 +2,8 @@
   "setup_validation_failed": {
     "status_code": 400,
     "title": "建账请求无效",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": null
   },
   "setup_already_completed": {
     "status_code": 409,

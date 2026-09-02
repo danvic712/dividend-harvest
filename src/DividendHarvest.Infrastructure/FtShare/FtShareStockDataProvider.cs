@@ -116,7 +116,6 @@ public sealed class FtShareStockDataProvider(
             || string.IsNullOrWhiteSpace(options.ExchangeCodeArgumentName))
         {
             throw new StockDataProviderUnavailableException(
-                "FTShare MCP 股票资料工具配置不完整。",
                 new InvalidOperationException("FTShare MCP 股票资料工具配置不完整。"));
         }
     }
@@ -138,13 +137,11 @@ public sealed class FtShareStockDataProvider(
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new StockDataProviderUnavailableException(
-                timeoutMessage,
                 new TimeoutException(timeoutMessage));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             throw new StockDataProviderUnavailableException(
-                unavailableMessage,
                 exception);
         }
     }

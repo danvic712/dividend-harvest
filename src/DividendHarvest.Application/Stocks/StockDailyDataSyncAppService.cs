@@ -33,18 +33,16 @@ public sealed class StockDailyDataSyncAppService(
                     request,
                     cancellationToken),
                 failures,
-                applicationErrorCatalog,
                 cancellationToken);
             await TrySyncAsync(
                 stock,
                 "dividend",
                 () => stockDividendEventAppService.SyncAsync(
-                    new SyncStockDividendsRequest(
+                new SyncStockDividendsRequest(
                         stock.SecurityCode,
                         stock.ExchangeCode),
                     cancellationToken),
                 failures,
-                applicationErrorCatalog,
                 cancellationToken);
             await TrySyncAsync(
                 stock,
@@ -55,7 +53,6 @@ public sealed class StockDailyDataSyncAppService(
                         stock.ExchangeCode),
                     cancellationToken),
                 failures,
-                applicationErrorCatalog,
                 cancellationToken);
 
             if (failures.Count == stockFailuresBeforeSync)
@@ -75,12 +72,11 @@ public sealed class StockDailyDataSyncAppService(
             timeProvider.GetUtcNow());
     }
 
-    private static async Task TrySyncAsync(
+    private async Task TrySyncAsync(
         StockWatchlistItem stock,
         string dataKind,
         Func<Task> sync,
         ICollection<StockDataSyncFailure> failures,
-        IApplicationErrorCatalog applicationErrorCatalog,
         CancellationToken cancellationToken)
     {
         try

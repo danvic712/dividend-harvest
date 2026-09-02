@@ -137,7 +137,6 @@ public sealed class SetupAppServiceTests
         provider
             .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new StockDataProviderUnavailableException(
-                "FTShare MCP 股票资料暂时不可用。",
                 new TimeoutException("FTShare MCP 请求超时。")));
         var unitOfWork = CreateUnitOfWork(repository);
         var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());

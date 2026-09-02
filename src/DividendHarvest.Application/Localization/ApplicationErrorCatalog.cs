@@ -38,26 +38,42 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
 
         var cultureName = SelectCulture(acceptLanguage);
         var cultureDefinitions = definitions[cultureName];
-        var errorCode = cultureDefinitions.ContainsKey(exception.ErrorCode)
-            ? exception.ErrorCode
-            : UnknownErrorCode;
-        var definition = cultureDefinitions[errorCode];
+        if (!cultureDefinitions.TryGetValue(exception.ErrorCode, out var definition))
+        {
+            throw new InvalidOperationException(
+                $"Application error code '{exception.ErrorCode}' is not defined in locale '{cultureName}'.");
+        }
 
         return new LocalizedApplicationError(
-            errorCode,
+            exception.ErrorCode,
             cultureName,
             definition.StatusCode,
             definition.Title,
-            Interpolate(definition.Detail, exception.Parameters, cultureName));
+            Interpolate(
+                definition.Detail,
+                GetInterpolationParameters(exception, definition),
+                cultureName));
     }
 
     private string SelectCulture(string? acceptLanguage)
     {
         if (!string.IsNullOrWhiteSpace(acceptLanguage))
         {
-            foreach (var language in acceptLanguage.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            var preferences = acceptLanguage
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select((language, index) => ParseLanguagePreference(language, index))
+                .Where(preference => preference.Quality > 0)
+                .OrderByDescending(preference => preference.Quality)
+                .ThenBy(preference => preference.Index);
+
+            foreach (var preference in preferences)
             {
-                var languageName = language.Split(';', 2)[0].Trim();
+                var languageName = preference.LanguageName;
+                if (languageName == "*")
+                {
+                    continue;
+                }
+
                 if (definitions.ContainsKey(languageName))
                 {
                     return languageName;
@@ -76,6 +92,32 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
         }
 
         return DefaultCultureName;
+    }
+
+    private static (string LanguageName, double Quality, int Index) ParseLanguagePreference(
+        string language,
+        int index)
+    {
+        var segments = language.Split(';', StringSplitOptions.RemoveEmptyEntries);
+        var languageName = segments[0].Trim();
+        var quality = 1d;
+        var qualityParameter = segments
+            .Skip(1)
+            .Select(segment => segment.Trim())
+            .FirstOrDefault(segment => segment.StartsWith("q=", StringComparison.OrdinalIgnoreCase));
+
+        if (qualityParameter is not null
+            && (!double.TryParse(
+                qualityParameter[2..],
+                NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out quality)
+                || quality is < 0 or > 1))
+        {
+            quality = 0;
+        }
+
+        return (languageName, quality, index);
     }
 
     private static string Interpolate(
@@ -102,6 +144,24 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
         }
 
         return result;
+    }
+
+    private static IReadOnlyDictionary<string, object?> GetInterpolationParameters(
+        ApplicationExceptionBase exception,
+        ApplicationErrorDefinition definition)
+    {
+        if (exception is not ApplicationValidationException
+            || string.IsNullOrWhiteSpace(definition.ValidationMessage))
+        {
+            return exception.Parameters;
+        }
+
+        var parameters = exception.Parameters.ToDictionary(
+            parameter => parameter.Key,
+            parameter => parameter.Value,
+            StringComparer.Ordinal);
+        parameters["message"] = definition.ValidationMessage;
+        return parameters;
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ApplicationErrorDefinition>> LoadDefinitions(
@@ -166,14 +226,51 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
             }
         }
 
-        var defaultCodes = cultures["zh-CN"].Keys.Order(StringComparer.Ordinal).ToArray();
+        var exceptionCodes = assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract && typeof(ApplicationExceptionBase).IsAssignableFrom(type))
+            .Select(type =>
+            {
+                var attribute = type.GetCustomAttribute<ApplicationErrorCodeAttribute>()
+                    ?? throw new InvalidOperationException(
+                        $"Application exception '{type.FullName}' must declare {nameof(ApplicationErrorCodeAttribute)}.");
+                return (Type: type, ErrorCode: attribute.ErrorCode);
+            })
+            .ToArray();
+        var duplicateExceptionCodes = exceptionCodes
+            .GroupBy(item => item.ErrorCode, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateExceptionCodes is not null)
+        {
+            throw new InvalidOperationException(
+                $"Application error code '{duplicateExceptionCodes.Key}' is used by multiple exception types.");
+        }
+
+        var expectedCodes = exceptionCodes
+            .Select(item => item.ErrorCode)
+            .Append(UnknownErrorCode)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
         foreach (var (cultureName, cultureDefinitions) in cultures)
         {
             var currentCodes = cultureDefinitions.Keys.Order(StringComparer.Ordinal).ToArray();
-            if (!defaultCodes.SequenceEqual(currentCodes, StringComparer.Ordinal))
+            if (!expectedCodes.SequenceEqual(currentCodes, StringComparer.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Locale '{cultureName}' does not define the same application error codes as zh-CN.");
+                    $"Locale '{cultureName}' does not define the complete application error catalog.");
+            }
+
+            foreach (var errorCode in expectedCodes)
+            {
+                var defaultDefinition = cultures["zh-CN"][errorCode];
+                var currentDefinition = cultureDefinitions[errorCode];
+                if (currentDefinition.StatusCode != defaultDefinition.StatusCode
+                    || !GetPlaceholders(currentDefinition.Detail).SetEquals(
+                        GetPlaceholders(defaultDefinition.Detail)))
+                {
+                    throw new InvalidOperationException(
+                        $"Locale '{cultureName}' does not preserve the HTTP status or placeholders for '{errorCode}'.");
+                }
             }
         }
 
@@ -196,5 +293,40 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
         }
 
         return (segments[0].Replace('_', '-'), segments[^1]);
+    }
+
+    private static HashSet<string> GetPlaceholders(string template)
+    {
+        var placeholders = new HashSet<string>(StringComparer.Ordinal);
+        var searchStart = 0;
+        while (searchStart < template.Length)
+        {
+            var openingBraceIndex = template.IndexOf('{', searchStart);
+            if (openingBraceIndex < 0)
+            {
+                break;
+            }
+
+            var closingBraceIndex = template.IndexOf('}', openingBraceIndex + 1);
+            if (closingBraceIndex < 0)
+            {
+                throw new InvalidOperationException(
+                    $"Locale template '{template}' contains an unclosed placeholder.");
+            }
+
+            var placeholder = template[
+                (openingBraceIndex + 1)..closingBraceIndex].Trim();
+            if (placeholder.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Locale template '{template}' contains an invalid placeholder.");
+            }
+
+            placeholders.Add(placeholder);
+
+            searchStart = closingBraceIndex + 1;
+        }
+
+        return placeholders;
     }
 }

@@ -2,7 +2,8 @@
   "model_parameter_validation_failed": {
     "status_code": 400,
     "title": "股票模型参数无效",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": null
   },
   "model_parameter_version_already_exists": {
     "status_code": 409,
@@ -12,6 +13,7 @@
   "stock_analysis_validation_failed": {
     "status_code": 400,
     "title": "股票分析请求无效",
-    "detail": "{message}"
+    "detail": "{message}",
+    "validation_message": null
   }
 }
