@@ -2,10 +2,11 @@ using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
-using DividendHarvest.Application.Trades;
+using DividendHarvest.Application.Portfolio;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using Moq;
 using Xunit;
 
@@ -216,7 +217,7 @@ public sealed class PortfolioTradeAppServiceTests
     private static PortfolioTradeAppService CreateService(IUow unitOfWork)
         => new(unitOfWork, new RecordPortfolioTradeRequestValidator());
 
-    private static Portfolio CreatePortfolio()
+    private static PortfolioEntity CreatePortfolio()
         => new()
         {
             Id = Guid.NewGuid(),
@@ -256,14 +257,14 @@ public sealed class PortfolioTradeAppServiceTests
     }
 
     private static Mock<IUow> CreateUnitOfWork(
-        Mock<IRepository<Portfolio>> portfolioRepository,
+        Mock<IRepository<PortfolioEntity>> portfolioRepository,
         Mock<IRepository<Security>> securityRepository,
         Mock<IRepository<PortfolioPosition>> positionRepository,
         Mock<IRepository<PortfolioTrade>> tradeRepository,
         Mock<IRepository<CashLedgerEntry>> cashRepository)
     {
         var unitOfWork = new Mock<IUow>();
-        unitOfWork.Setup(x => x.Get<Portfolio>()).Returns(portfolioRepository.Object);
+        unitOfWork.Setup(x => x.Get<PortfolioEntity>()).Returns(portfolioRepository.Object);
         unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
         unitOfWork
             .Setup(x => x.Get<PortfolioPosition>())

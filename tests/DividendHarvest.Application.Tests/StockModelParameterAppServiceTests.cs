@@ -2,11 +2,12 @@ using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
-using DividendHarvest.Application.ModelParameters;
+using DividendHarvest.Application.DividendStrategy;
 using DividendHarvest.Application.Validators;
-using DividendHarvest.Application.Watchlist;
+using DividendHarvest.Application.Stocks;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using Moq;
 using Xunit;
 
@@ -26,7 +27,7 @@ public sealed class StockModelParameterAppServiceTests
             MarketCode = "A-share",
             CurrencyCode = "CNY"
         };
-        var portfolio = new Portfolio
+        var portfolio = new PortfolioEntity
         {
             Id = Guid.NewGuid(),
             Name = "长期股息组合"
@@ -59,7 +60,7 @@ public sealed class StockModelParameterAppServiceTests
     {
         var unitOfWork = CreateUnitOfWork(
             CreateRepository<Security>([]),
-            CreateRepository([new Portfolio { Id = Guid.NewGuid(), Name = "长期股息组合" }]),
+            CreateRepository([new PortfolioEntity { Id = Guid.NewGuid(), Name = "长期股息组合" }]),
             CreateRepository<ModelParameterSet>([]));
         var service = CreateService(unitOfWork.Object);
 
@@ -180,7 +181,7 @@ public sealed class StockModelParameterAppServiceTests
             CurrencyCode = "CNY"
         };
 
-    private static Portfolio CreatePortfolio()
+    private static PortfolioEntity CreatePortfolio()
         => new()
         {
             Id = Guid.NewGuid(),
@@ -229,12 +230,12 @@ public sealed class StockModelParameterAppServiceTests
 
     private static Mock<IUow> CreateUnitOfWork(
         Mock<IRepository<Security>> securityRepository,
-        Mock<IRepository<Portfolio>> portfolioRepository,
+        Mock<IRepository<PortfolioEntity>> portfolioRepository,
         Mock<IRepository<ModelParameterSet>> parameterRepository)
     {
         var unitOfWork = new Mock<IUow>();
         unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
-        unitOfWork.Setup(x => x.Get<Portfolio>()).Returns(portfolioRepository.Object);
+        unitOfWork.Setup(x => x.Get<PortfolioEntity>()).Returns(portfolioRepository.Object);
         unitOfWork.Setup(x => x.Get<ModelParameterSet>()).Returns(parameterRepository.Object);
         unitOfWork
             .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))

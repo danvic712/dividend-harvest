@@ -4,12 +4,13 @@ using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Trades;
+namespace DividendHarvest.Application.Portfolio;
 
 public sealed class PortfolioTradeAppService(
     IUow uow,
@@ -27,7 +28,7 @@ public sealed class PortfolioTradeAppService(
                 ValidationErrorFormatter.Format(validationResult));
         }
 
-        var portfolio = await uow.Get<Portfolio>()
+        var portfolio = await uow.Get<PortfolioEntity>()
             .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
@@ -166,7 +167,7 @@ public sealed class PortfolioTradeAppService(
 
     private static PortfolioTradeResult ToResult(
         PortfolioTrade trade,
-        Portfolio portfolio,
+        PortfolioEntity portfolio,
         AShareReference reference,
         PortfolioPosition position)
         => new(

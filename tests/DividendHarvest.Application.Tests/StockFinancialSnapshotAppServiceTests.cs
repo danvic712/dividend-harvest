@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
-using DividendHarvest.Application.Financials;
+using DividendHarvest.Application.Stocks;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;

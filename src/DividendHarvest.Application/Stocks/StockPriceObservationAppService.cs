@@ -8,7 +8,7 @@ using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.PriceObservations;
+namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockPriceObservationAppService(
     IUow uow,

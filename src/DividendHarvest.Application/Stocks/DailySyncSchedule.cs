@@ -1,4 +1,4 @@
-namespace DividendHarvest.Application.DailySync;
+namespace DividendHarvest.Application.Stocks;
 
 public static class DailySyncSchedule
 {

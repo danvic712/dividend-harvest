@@ -8,7 +8,7 @@ using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Dividends;
+namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockDividendEventAppService(
     IUow uow,

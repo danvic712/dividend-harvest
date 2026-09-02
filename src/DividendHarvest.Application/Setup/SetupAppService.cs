@@ -4,6 +4,7 @@ using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
@@ -18,7 +19,7 @@ public sealed class SetupAppService(
 {
     public async Task<SetupStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var isComplete = await uow.Get<Portfolio>()
+        var isComplete = await uow.Get<PortfolioEntity>()
             .GetQueryable(asNoTracking: true)
             .AnyAsync(cancellationToken);
 
@@ -40,7 +41,7 @@ public sealed class SetupAppService(
                 ValidationErrorFormatter.Format(validationResult));
         }
 
-        if (await uow.Get<Portfolio>()
+        if (await uow.Get<PortfolioEntity>()
             .GetQueryable(asNoTracking: true)
             .AnyAsync(cancellationToken))
         {
@@ -97,12 +98,12 @@ public sealed class SetupAppService(
                 initialHolding));
         }
 
-        var portfolioRepository = uow.Get<Portfolio>();
+        var portfolioRepository = uow.Get<PortfolioEntity>();
         var securityRepository = uow.Get<Security>();
         var positionRepository = uow.Get<PortfolioPosition>();
 
         await portfolioRepository.AddAsync(
-            new Portfolio
+                new PortfolioEntity
             {
                 Id = portfolioId,
                 Name = portfolioName

@@ -5,7 +5,7 @@ using DividendHarvest.Domain.DividendModel;
 using DividendHarvest.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Recommendations;
+namespace DividendHarvest.Application.DividendStrategy;
 
 public sealed class PortfolioRecommendationAppService(
     IUow uow,

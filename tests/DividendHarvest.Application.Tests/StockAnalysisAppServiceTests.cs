@@ -1,11 +1,12 @@
 using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
-using DividendHarvest.Application.Analysis;
+using DividendHarvest.Application.DividendStrategy;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using Moq;
 using Xunit;
 
@@ -17,7 +18,7 @@ public sealed class StockAnalysisAppServiceTests
     public async Task GetAsync_calculates_ttm_dividend_yield_and_price_zone()
     {
         var security = CreateSecurity();
-        var portfolio = new Portfolio
+        var portfolio = new PortfolioEntity
         {
             Id = Guid.NewGuid(),
             Name = "长期股息组合"
@@ -96,7 +97,7 @@ public sealed class StockAnalysisAppServiceTests
     public async Task GetAsync_returns_unavailable_when_ttm_dividend_is_missing()
     {
         var security = CreateSecurity();
-        var portfolio = new Portfolio
+        var portfolio = new PortfolioEntity
         {
             Id = Guid.NewGuid(),
             Name = "长期股息组合"
@@ -136,7 +137,7 @@ public sealed class StockAnalysisAppServiceTests
     public async Task GetAsync_exposes_recommendation_when_dividend_reliability_passes()
     {
         var security = CreateSecurity();
-        var portfolio = new Portfolio
+        var portfolio = new PortfolioEntity
         {
             Id = Guid.NewGuid(),
             Name = "长期股息组合"

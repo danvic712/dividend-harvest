@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
-using DividendHarvest.Application.Recommendations;
+using DividendHarvest.Application.DividendStrategy;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using Moq;

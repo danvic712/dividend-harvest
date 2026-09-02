@@ -2,7 +2,7 @@ using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 
-namespace DividendHarvest.Application.DailySync;
+namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockDailyDataSyncAppService(
     IStockWatchlistAppService stockWatchlistAppService,

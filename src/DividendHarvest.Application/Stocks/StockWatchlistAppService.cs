@@ -4,7 +4,7 @@ using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Watchlist;
+namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockWatchlistAppService(IUow uow) : IStockWatchlistAppService
 {

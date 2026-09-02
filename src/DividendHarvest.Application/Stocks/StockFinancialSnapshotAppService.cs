@@ -8,7 +8,7 @@ using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Financials;
+namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockFinancialSnapshotAppService(
     IUow uow,

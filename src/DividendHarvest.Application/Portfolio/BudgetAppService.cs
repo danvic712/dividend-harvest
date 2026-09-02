@@ -4,12 +4,13 @@ using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Budget;
+namespace DividendHarvest.Application.Portfolio;
 
 public sealed class BudgetAppService(
     IUow uow,
@@ -28,7 +29,7 @@ public sealed class BudgetAppService(
                 ValidationErrorFormatter.Format(validationResult));
         }
 
-        var portfolio = await uow.Get<Portfolio>()
+        var portfolio = await uow.Get<PortfolioEntity>()
             .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
@@ -90,7 +91,7 @@ public sealed class BudgetAppService(
     public async Task<BudgetSummary> GetSummaryAsync(
         CancellationToken cancellationToken)
     {
-        var portfolio = await uow.Get<Portfolio>()
+        var portfolio = await uow.Get<PortfolioEntity>()
             .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)

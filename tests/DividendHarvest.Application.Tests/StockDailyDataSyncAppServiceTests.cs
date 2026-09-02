@@ -1,5 +1,5 @@
 using DividendHarvest.Application.Contracts;
-using DividendHarvest.Application.DailySync;
+using DividendHarvest.Application.Stocks;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using Moq;

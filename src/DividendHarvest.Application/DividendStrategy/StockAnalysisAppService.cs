@@ -9,7 +9,7 @@ using DividendHarvest.Domain.Securities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Application.Analysis;
+namespace DividendHarvest.Application.DividendStrategy;
 
 public sealed class StockAnalysisAppService(
     IUow uow,

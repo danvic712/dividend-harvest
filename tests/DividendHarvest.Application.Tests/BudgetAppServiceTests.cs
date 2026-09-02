@@ -1,11 +1,12 @@
 using System.Linq.Expressions;
-using DividendHarvest.Application.Budget;
+using DividendHarvest.Application.Portfolio;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using Moq;
 using Xunit;
 
@@ -138,7 +139,7 @@ public sealed class BudgetAppServiceTests
                 null),
             CancellationToken.None));
 
-        unitOfWork.Verify(x => x.Get<Portfolio>(), Times.Never);
+        unitOfWork.Verify(x => x.Get<PortfolioEntity>(), Times.Never);
     }
 
     private static BudgetAppService CreateService(IUow unitOfWork)
@@ -148,7 +149,7 @@ public sealed class BudgetAppServiceTests
             new FixedTimeProvider(
                 new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero)));
 
-    private static Portfolio CreatePortfolio()
+    private static PortfolioEntity CreatePortfolio()
         => new()
         {
             Id = Guid.NewGuid(),
@@ -169,12 +170,12 @@ public sealed class BudgetAppServiceTests
     }
 
     private static Mock<IUow> CreateUnitOfWork(
-        Mock<IRepository<Portfolio>> portfolioRepository,
+        Mock<IRepository<PortfolioEntity>> portfolioRepository,
         Mock<IRepository<CashLedgerEntry>> ledgerRepository,
         Mock<IRepository<Security>>? securityRepository = null)
     {
         var unitOfWork = new Mock<IUow>();
-        unitOfWork.Setup(x => x.Get<Portfolio>()).Returns(portfolioRepository.Object);
+        unitOfWork.Setup(x => x.Get<PortfolioEntity>()).Returns(portfolioRepository.Object);
         unitOfWork.Setup(x => x.Get<CashLedgerEntry>()).Returns(ledgerRepository.Object);
         if (securityRepository is not null)
         {

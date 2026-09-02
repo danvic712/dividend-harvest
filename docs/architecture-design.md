@@ -12,6 +12,9 @@ Dividend Harvest 是一个面向个人 A 股长期投资者的私人工具。后
 DividendHarvest Host
 ├── Application.Contracts / Dtos / Exceptions / Validators
 ├── Application.Setup
+├── Application.Stocks
+├── Application.Portfolio
+├── Application.DividendStrategy
 └── Infrastructure
     ├── Contracts
     ├── Configurations
@@ -70,21 +73,27 @@ src/
 │   │   ├── IStockFinancialSnapshotAppService.cs
 │   │   ├── IBudgetAppService.cs
 │   │   ├── IPortfolioRecommendationAppService.cs
-│   │   └── IRecommendationSnapshotAppService.cs
+│   │   ├── IRecommendationSnapshotAppService.cs
+│   │   └── IStockDailyDataSyncAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
 │   ├── Setup/                          # AppService 实现和用例编排
-│   ├── Watchlist/                      # 股票关注列表查询
-│   ├── ModelParameters/                # 股票模型参数版本管理
-│   ├── PriceObservations/              # 收盘行情快照同步
-│   ├── Dividends/                      # 股息事实同步
-│   ├── Financials/                     # 财务事实同步
-│   ├── Budget/                         # 组合现金流水与预算摘要
-│   ├── Recommendations/                # 多股票预算分配与建议
-│   ├── DailySync/                      # 交易日数据同步编排
-│   ├── Trades/                         # 买卖交易与持仓成本更新
-│   └── Analysis/                      # 当前股票分析结果
+│   ├── Stocks/                         # 股票资料、关注列表和交易日数据同步
+│   │   ├── StockWatchlistAppService.cs
+│   │   ├── StockPriceObservationAppService.cs
+│   │   ├── StockDividendEventAppService.cs
+│   │   ├── StockFinancialSnapshotAppService.cs
+│   │   ├── StockDailyDataSyncAppService.cs
+│   │   └── DailySyncSchedule.cs
+│   ├── Portfolio/                      # 组合现金流水、交易和持仓变更
+│   │   ├── BudgetAppService.cs
+│   │   └── PortfolioTradeAppService.cs
+│   └── DividendStrategy/               # 模型参数、单股分析和组合建议
+│       ├── StockModelParameterAppService.cs
+│       ├── StockAnalysisAppService.cs
+│       ├── PortfolioRecommendationAppService.cs
+│       └── RecommendationSnapshotAppService.cs
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -107,6 +116,10 @@ src/
     │   └── DailyStockDataSyncHostedService.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
+
+Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 Interface：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和异常语义；单股分析与组合建议也保持独立。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。
+
+`Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
 
 约束：
 

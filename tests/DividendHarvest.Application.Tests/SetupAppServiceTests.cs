@@ -6,6 +6,7 @@ using DividendHarvest.Application.Setup;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
+using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Securities;
 using Moq;
 using Xunit;
@@ -66,7 +67,7 @@ public sealed class SetupAppServiceTests
         Assert.Equal(2, result.Stocks.Count);
         Assert.Equal("平安银行", result.Stocks[0].SecurityName);
         repository.Verify(x => x.AddAsync(
-            It.Is<Portfolio>(portfolio => portfolio.Name == "长期股息组合"),
+            It.Is<PortfolioEntity>(portfolio => portfolio.Name == "长期股息组合"),
             It.IsAny<CancellationToken>()), Times.Once);
         securityRepository.Verify(x => x.AddAsync(It.IsAny<Security>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         positionRepository.Verify(x => x.AddAsync(
@@ -125,7 +126,7 @@ public sealed class SetupAppServiceTests
             CancellationToken.None));
 
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddAsync(It.IsAny<Portfolio>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -147,7 +148,7 @@ public sealed class SetupAppServiceTests
 
         Assert.IsType<StockDataProviderUnavailableException>(exception.InnerException);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddAsync(It.IsAny<Portfolio>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -166,12 +167,12 @@ public sealed class SetupAppServiceTests
             CancellationToken.None));
 
         Assert.Contains("投资组合名称必须为 1 到 100 个字符。", exception.Message);
-        unitOfWork.Verify(x => x.Get<Portfolio>(), Times.Never);
+        unitOfWork.Verify(x => x.Get<PortfolioEntity>(), Times.Never);
         provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static SetupAppService CreateService(
-        Mock<IRepository<Portfolio>> repository,
+        Mock<IRepository<PortfolioEntity>> repository,
         Mock<IStockDataProvider>? provider = null)
     {
         var unitOfWork = CreateUnitOfWork(repository);
@@ -184,27 +185,27 @@ public sealed class SetupAppServiceTests
     private static SetupRequestValidator CreateRequestValidator()
         => new(new SetupStockRequestValidator(new InitialHoldingInputValidator()));
 
-    private static Mock<IRepository<Portfolio>> CreatePortfolioRepository(bool hasPortfolio)
+    private static Mock<IRepository<PortfolioEntity>> CreatePortfolioRepository(bool hasPortfolio)
     {
-        var repository = new Mock<IRepository<Portfolio>>();
+        var repository = new Mock<IRepository<PortfolioEntity>>();
         repository
             .Setup(x => x.GetQueryable(
                 It.IsAny<bool>(),
-                It.IsAny<Expression<Func<Portfolio, object>>[]>()))
+                It.IsAny<Expression<Func<PortfolioEntity, object>>[]>()))
             .Returns(new[]
             {
                 hasPortfolio
-                    ? new Portfolio { Id = Guid.NewGuid(), Name = "长期股息组合" }
+                    ? new PortfolioEntity { Id = Guid.NewGuid(), Name = "长期股息组合" }
                     : null
             }
             .Where(entity => entity is not null)
-            .Cast<Portfolio>()
+            .Cast<PortfolioEntity>()
             .AsAsyncQueryable());
         return repository;
     }
 
     private static Mock<IUow> CreateUnitOfWork(
-        Mock<IRepository<Portfolio>> portfolioRepository,
+        Mock<IRepository<PortfolioEntity>> portfolioRepository,
         Mock<IRepository<Security>>? securityRepository = null,
         Mock<IRepository<PortfolioPosition>>? positionRepository = null)
     {
@@ -212,7 +213,7 @@ public sealed class SetupAppServiceTests
         positionRepository ??= new Mock<IRepository<PortfolioPosition>>();
         var unitOfWork = new Mock<IUow>();
         unitOfWork
-            .Setup(x => x.Get<Portfolio>())
+            .Setup(x => x.Get<PortfolioEntity>())
             .Returns(portfolioRepository.Object);
         unitOfWork
             .Setup(x => x.Get<Security>())
