@@ -8,4 +8,8 @@ public interface IStockDataProvider
     Task<StockData?> GetAsync(
         AShareReference reference,
         CancellationToken cancellationToken);
+
+    Task<StockMarketData?> GetMarketDataAsync(
+        AShareReference reference,
+        CancellationToken cancellationToken);
 }

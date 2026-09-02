@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
@@ -26,39 +27,76 @@ public sealed class FtShareStockDataProvider(
             [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
         };
 
-        JsonElement? payload;
-        try
-        {
-            payload = await toolInvoker.InvokeAsync(
-                currentOptions.StockProfileToolName,
-                arguments,
-                cancellationToken);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new StockDataProviderUnavailableException(
-                "FTShare MCP 请求超时。",
-                new TimeoutException("FTShare MCP 请求超时。"));
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            throw new StockDataProviderUnavailableException(
-                "FTShare MCP 股票资料暂时不可用。",
-                exception);
-        }
-
+        var payload = await InvokeToolAsync(
+            currentOptions.StockProfileToolName,
+            arguments,
+            cancellationToken,
+            "FTShare MCP 请求超时。",
+            "FTShare MCP 股票资料暂时不可用。");
         return ParseStockData(reference, payload);
+    }
+
+    public async Task<StockMarketData?> GetMarketDataAsync(
+        AShareReference reference,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+
+        var currentOptions = options.Value;
+        ValidateOptions(currentOptions);
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
+            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
+        };
+
+        var payload = await InvokeToolAsync(
+            currentOptions.StockMarketDataToolName,
+            arguments,
+            cancellationToken,
+            "FTShare MCP 行情请求超时。",
+            "FTShare MCP 行情数据暂时不可用。");
+        return ParseMarketData(reference, payload);
     }
 
     private static void ValidateOptions(FtShareOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.StockProfileToolName)
+            || string.IsNullOrWhiteSpace(options.StockMarketDataToolName)
             || string.IsNullOrWhiteSpace(options.SecurityCodeArgumentName)
             || string.IsNullOrWhiteSpace(options.ExchangeCodeArgumentName))
         {
             throw new StockDataProviderUnavailableException(
                 "FTShare MCP 股票资料工具配置不完整。",
                 new InvalidOperationException("FTShare MCP 股票资料工具配置不完整。"));
+        }
+    }
+
+    private async Task<JsonElement?> InvokeToolAsync(
+        string toolName,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken,
+        string timeoutMessage,
+        string unavailableMessage)
+    {
+        try
+        {
+            return await toolInvoker.InvokeAsync(
+                toolName,
+                arguments,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new StockDataProviderUnavailableException(
+                timeoutMessage,
+                new TimeoutException(timeoutMessage));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw new StockDataProviderUnavailableException(
+                unavailableMessage,
+                exception);
         }
     }
 
@@ -71,7 +109,7 @@ public sealed class FtShareStockDataProvider(
             return null;
         }
 
-        var profile = SelectProfile(value);
+        var profile = SelectPayload(value);
         if (profile is not { ValueKind: JsonValueKind.Object })
         {
             return null;
@@ -107,7 +145,7 @@ public sealed class FtShareStockDataProvider(
             currencyCode);
     }
 
-    private static JsonElement? SelectProfile(JsonElement value)
+    private static JsonElement? SelectPayload(JsonElement value)
     {
         if (value.ValueKind == JsonValueKind.String)
         {
@@ -127,7 +165,18 @@ public sealed class FtShareStockDataProvider(
             return null;
         }
 
-        if (HasAnyProperty(value, "security_name", "stock_name", "company_name", "name"))
+        if (HasAnyProperty(
+                value,
+                "security_name",
+                "stock_name",
+                "company_name",
+                "name",
+                "close_price",
+                "closing_price",
+                "last_price",
+                "price",
+                "trading_date",
+                "data_as_of_date"))
         {
             return value;
         }
@@ -136,7 +185,7 @@ public sealed class FtShareStockDataProvider(
         {
             if (TryGetProperty(value, envelopeName, out var nested))
             {
-                var profile = SelectProfile(nested);
+                var profile = SelectPayload(nested);
                 if (profile is not null)
                 {
                     return profile;
@@ -145,6 +194,95 @@ public sealed class FtShareStockDataProvider(
         }
 
         return null;
+    }
+
+    private static StockMarketData? ParseMarketData(
+        AShareReference reference,
+        JsonElement? payload)
+    {
+        if (payload is not { } value)
+        {
+            return null;
+        }
+
+        var marketData = SelectPayload(value);
+        if (marketData is not { ValueKind: JsonValueKind.Object })
+        {
+            return null;
+        }
+
+        var returnedCode = ReadString(
+            marketData.Value,
+            "security_code",
+            "stock_code",
+            "code",
+            "symbol");
+        if (returnedCode is not null
+            && NormalizeSecurityCode(returnedCode) != reference.SecurityCode)
+        {
+            return null;
+        }
+
+        var returnedExchange = ReadString(
+            marketData.Value,
+            "exchange_code",
+            "exchange");
+        if (returnedExchange is not null
+            && NormalizeExchangeCode(returnedExchange) != reference.ExchangeCode)
+        {
+            return null;
+        }
+
+        var closePrice = ReadDecimal(
+            marketData.Value,
+            "close_price",
+            "closing_price",
+            "last_price",
+            "price");
+        var tradingDate = ReadDateOnly(
+            marketData.Value,
+            "trading_date",
+            "data_as_of_date",
+            "as_of_date",
+            "date");
+        var priceObservedAt = ReadDateTimeOffset(
+            marketData.Value,
+            "price_observed_at",
+            "observed_at",
+            "captured_at");
+        if (closePrice is null || tradingDate is null || priceObservedAt is null)
+        {
+            return null;
+        }
+
+        var sourceRecordId = ReadString(
+            marketData.Value,
+            "source_record_id",
+            "record_id",
+            "id");
+        var dataSource = ReadString(
+            marketData.Value,
+            "data_source",
+            "source");
+        var dataQualityCode = ReadString(
+            marketData.Value,
+            "data_quality_code",
+            "quality_code");
+
+        if (sourceRecordId is null || dataSource is null || dataQualityCode is null)
+        {
+            return null;
+        }
+
+        return new StockMarketData(
+            reference.SecurityCode,
+            reference.ExchangeCode,
+            closePrice.Value,
+            tradingDate.Value,
+            priceObservedAt.Value,
+            dataSource,
+            sourceRecordId,
+            dataQualityCode);
     }
 
     private static string? ReadString(JsonElement value, params string[] propertyNames)
@@ -171,6 +309,65 @@ public sealed class FtShareStockDataProvider(
         }
 
         return null;
+    }
+
+    private static decimal? ReadDecimal(JsonElement value, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (!TryGetProperty(value, propertyName, out var property))
+            {
+                continue;
+            }
+
+            if (property.ValueKind == JsonValueKind.Number
+                && property.TryGetDecimal(out var number))
+            {
+                return number;
+            }
+
+            if (property.ValueKind == JsonValueKind.String
+                && decimal.TryParse(
+                    property.GetString(),
+                    NumberStyles.Number,
+                    CultureInfo.InvariantCulture,
+                    out number))
+            {
+                return number;
+            }
+        }
+
+        return null;
+    }
+
+    private static DateOnly? ReadDateOnly(
+        JsonElement value,
+        params string[] propertyNames)
+    {
+        var text = ReadString(value, propertyNames);
+        return text is not null
+            && DateOnly.TryParse(
+                text,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var date)
+            ? date
+            : null;
+    }
+
+    private static DateTimeOffset? ReadDateTimeOffset(
+        JsonElement value,
+        params string[] propertyNames)
+    {
+        var text = ReadString(value, propertyNames);
+        return text is not null
+            && DateTimeOffset.TryParse(
+                text,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal,
+                out var observedAt)
+            ? observedAt
+            : null;
     }
 
     private static string NormalizeSecurityCode(string value)

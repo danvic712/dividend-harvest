@@ -47,7 +47,8 @@ src/
 │   │   ├── Portfolio.cs
 │   │   ├── PortfolioPosition.cs
 │   │   ├── Security.cs
-│   │   └── ModelParameterSet.cs
+│   │   ├── ModelParameterSet.cs
+│   │   └── PriceObservation.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   └── Securities/                     # A 股标识领域规则
@@ -56,13 +57,15 @@ src/
 │   │   ├── ISetupAppService.cs
 │   │   ├── IStockDataProvider.cs
 │   │   ├── IStockWatchlistAppService.cs
-│   │   └── IStockModelParameterAppService.cs
+│   │   ├── IStockModelParameterAppService.cs
+│   │   └── IStockPriceObservationAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
 │   ├── Setup/                          # AppService 实现和用例编排
 │   ├── Watchlist/                      # 股票关注列表查询
-│   └── ModelParameters/                # 股票模型参数版本管理
+│   ├── ModelParameters/                # 股票模型参数版本管理
+│   └── PriceObservations/              # 收盘行情快照同步
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -180,6 +183,7 @@ SetupAppService
 - `Configurations/PortfolioPositionConfiguration.cs`
 - `Configurations/SecurityConfiguration.cs`
 - `Configurations/ModelParameterSetConfiguration.cs`
+- `Configurations/PriceObservationConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -195,6 +199,7 @@ modelBuilder.ApplyConfigurationsFromAssembly(
 ```text
 Portfolio 1 ───────────── * PortfolioPosition * ───────────── 1 Security
 Portfolio 1 ───────────── * ModelParameterSet * ───────────── 1 Security
+Security 1 ───────────── * PriceObservation
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -235,6 +240,12 @@ FluentValidation 负责请求形状、字段范围、跨字段关系和集合重
 
 Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSet` 实体；重复生效日期返回 409，未配置股票返回 404，未完成首次建账返回 409。
 
+### 8.4 收盘行情快照
+
+`POST /api/stocks/{securityCode}/{exchangeCode}/price-observations/sync` 通过 `IStockDataProvider.GetMarketDataAsync` 获取 FTShare 规范化的收盘行情，并按 `security_id + trading_date` 幂等保存到 `price_observations`。快照包含收盘价、交易日期、观测时间、来源记录和数据质量代码；缺少价格、日期或来源信息时不会提交数据库。
+
+同一股票同一交易日重复同步时直接返回已有快照，不重复写入。外部行情不可用映射为 503，未配置股票映射为 404，请求参数仍由 FluentValidation 验证。
+
 ## 9. FTShare MCP Adapter
 
 ```text
@@ -250,7 +261,7 @@ IFtShareMcpToolInvoker
 FtShareMcpToolInvoker ──> official MCP Client ──> FTShare MCP
 ```
 
-`IFtShareMcpToolInvoker` 是 Infrastructure 内部 seam，位于 `Infrastructure/Contracts/`。`FtShareStockDataProvider` 负责 FTShare 返回值到 `StockData` DTO 的规范化，只接受 A 股和 CNY 资料，并拒绝缺少关键字段或股票身份不匹配的结果。
+`IFtShareMcpToolInvoker` 是 Infrastructure 内部 seam，位于 `Infrastructure/Contracts/`。`FtShareStockDataProvider` 负责 FTShare 返回值到 `StockData` 和 `StockMarketData` DTO 的规范化，只接受 A 股和 CNY 股票资料，并拒绝缺少关键字段或股票身份不匹配的结果。
 
 MCP 地址、工具名、股票代码参数名、交易所参数名和请求超时通过运行时配置注入。FTShare key 不进入代码、DTO、日志、镜像前端资源或 Git。
 

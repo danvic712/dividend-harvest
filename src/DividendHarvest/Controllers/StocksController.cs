@@ -8,7 +8,8 @@ namespace DividendHarvest.Controllers;
 [Route("api/stocks")]
 public sealed class StocksController(
     IStockWatchlistAppService stockWatchlistAppService,
-    IStockModelParameterAppService stockModelParameterAppService)
+    IStockModelParameterAppService stockModelParameterAppService,
+    IStockPriceObservationAppService stockPriceObservationAppService)
     : ControllerBase
 {
     [HttpGet]
@@ -47,5 +48,17 @@ public sealed class StocksController(
                 exchangeCode = parameters.ExchangeCode
             },
             parameters);
+    }
+
+    [HttpPost("{securityCode}/{exchangeCode}/price-observations/sync")]
+    public async Task<ActionResult<StockPriceObservationResult>> SyncPriceObservation(
+        string securityCode,
+        string exchangeCode,
+        CancellationToken cancellationToken)
+    {
+        var result = await stockPriceObservationAppService.SyncAsync(
+            new SyncStockPriceRequest(securityCode, exchangeCode),
+            cancellationToken);
+        return Ok(result);
     }
 }

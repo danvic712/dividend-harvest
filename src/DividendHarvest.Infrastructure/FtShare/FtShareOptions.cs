@@ -8,6 +8,8 @@ public sealed class FtShareOptions
 
     public string StockProfileToolName { get; set; } = "get_stock_profile";
 
+    public string StockMarketDataToolName { get; set; } = "get_stock_market_data";
+
     public string SecurityCodeArgumentName { get; set; } = "security_code";
 
     public string ExchangeCodeArgumentName { get; set; } = "exchange_code";
