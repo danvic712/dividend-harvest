@@ -10,7 +10,8 @@ public sealed class StocksController(
     IStockWatchlistAppService stockWatchlistAppService,
     IStockModelParameterAppService stockModelParameterAppService,
     IStockPriceObservationAppService stockPriceObservationAppService,
-    IStockDividendEventAppService stockDividendEventAppService)
+    IStockDividendEventAppService stockDividendEventAppService,
+    IStockAnalysisAppService stockAnalysisAppService)
     : ControllerBase
 {
     [HttpGet]
@@ -71,6 +72,18 @@ public sealed class StocksController(
     {
         var result = await stockDividendEventAppService.SyncAsync(
             new SyncStockDividendsRequest(securityCode, exchangeCode),
+            cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("{securityCode}/{exchangeCode}/analysis")]
+    public async Task<ActionResult<StockAnalysisResult>> GetAnalysis(
+        string securityCode,
+        string exchangeCode,
+        CancellationToken cancellationToken)
+    {
+        var result = await stockAnalysisAppService.GetAsync(
+            new GetStockAnalysisRequest(securityCode, exchangeCode),
             cancellationToken);
         return Ok(result);
     }

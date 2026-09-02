@@ -52,7 +52,8 @@ src/
 │   │   └── DividendEvent.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
-│   └── Securities/                     # A 股标识领域规则
+│   ├── Securities/                     # A 股标识领域规则
+│   └── DividendModel/                  # 股息率与价格区域计算
 ├── DividendHarvest.Application/
 │   ├── Contracts/                      # Application 对外 Interface
 │   │   ├── ISetupAppService.cs
@@ -60,7 +61,8 @@ src/
 │   │   ├── IStockWatchlistAppService.cs
 │   │   ├── IStockModelParameterAppService.cs
 │   │   ├── IStockPriceObservationAppService.cs
-│   │   └── IStockDividendEventAppService.cs
+│   │   ├── IStockDividendEventAppService.cs
+│   │   └── IStockAnalysisAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
@@ -68,7 +70,8 @@ src/
 │   ├── Watchlist/                      # 股票关注列表查询
 │   ├── ModelParameters/                # 股票模型参数版本管理
 │   ├── PriceObservations/              # 收盘行情快照同步
-│   └── Dividends/                      # 股息事实同步
+│   ├── Dividends/                      # 股息事实同步
+│   └── Analysis/                       # 当前股票分析结果
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -256,6 +259,12 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 `POST /api/stocks/{securityCode}/{exchangeCode}/dividend-events/sync` 通过 `IStockDataProvider.GetDividendEventsAsync` 获取 FTShare 股息事实，并按 `security_id + source_record_id` 幂等保存到 `dividend_events`。事件保留股息类型、实施状态、公告/除息/发放日期、特别股息标记、来源和数据质量，拟派与已取消事件不会在同步阶段被改写为已实施。
 
 批量同步先完成所有事件的身份和领域校验，再统一提交新增事件；空列表表示本次来源没有返回事件，不产生写入。后续 TTM 实际每股股息计算只选择已实施、常规现金且有有效除息日期的事件。
+
+### 8.6 当前股票分析
+
+`GET /api/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
+
+分析结果明确区分 `unavailable`、`cautious` 和价格区域；当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。买入预算、交易单位、核心仓保护和建议快照将在后续 Application 功能中接入。
 
 ## 9. FTShare MCP Adapter
 

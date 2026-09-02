@@ -1,0 +1,28 @@
+namespace DividendHarvest.Application.Dtos;
+
+public sealed record StockAnalysisResult(
+    string SecurityCode,
+    string ExchangeCode,
+    string SecurityName,
+    string ModelStatusCode,
+    string DividendReliabilityCode,
+    decimal? ClosePrice,
+    decimal? ModelDividendPerShare,
+    string? DividendModeCode,
+    decimal? DividendYield,
+    decimal? StrongBuyPrice,
+    decimal? AccumulatePrice,
+    decimal? PartialTrimPrice,
+    decimal? AggressiveTrimPrice,
+    string? PriceZoneCode,
+    string RecommendationCode,
+    int HeldShares,
+    int CoreShares,
+    int SatelliteShares,
+    int SuggestedBuyShares,
+    int SuggestedSellShares,
+    decimal SuggestedTradeAmount,
+    DateOnly? DataAsOfDate,
+    Guid? ModelParameterSetId,
+    DateTimeOffset ComputedAt,
+    string Explanation);
