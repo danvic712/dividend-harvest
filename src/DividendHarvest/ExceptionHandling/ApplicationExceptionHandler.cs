@@ -30,6 +30,8 @@ public sealed class ApplicationExceptionHandler(
                 (StatusCodes.Status503ServiceUnavailable, "股票行情数据暂时不可用"),
             StockDividendDataUnavailableException =>
                 (StatusCodes.Status503ServiceUnavailable, "股票股息数据暂时不可用"),
+            StockFinancialDataUnavailableException =>
+                (StatusCodes.Status503ServiceUnavailable, "股票财务数据暂时不可用"),
             StockDataUnavailableException => (StatusCodes.Status503ServiceUnavailable, "股票基础资料不可用"),
             _ => ((int StatusCode, string Title)?)null
         };

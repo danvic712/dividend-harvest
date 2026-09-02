@@ -49,7 +49,8 @@ src/
 │   │   ├── Security.cs
 │   │   ├── ModelParameterSet.cs
 │   │   ├── PriceObservation.cs
-│   │   └── DividendEvent.cs
+│   │   ├── DividendEvent.cs
+│   │   └── FinancialSnapshot.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   ├── Securities/                     # A 股标识领域规则
@@ -62,7 +63,8 @@ src/
 │   │   ├── IStockModelParameterAppService.cs
 │   │   ├── IStockPriceObservationAppService.cs
 │   │   ├── IStockDividendEventAppService.cs
-│   │   └── IStockAnalysisAppService.cs
+│   │   ├── IStockAnalysisAppService.cs
+│   │   └── IStockFinancialSnapshotAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
@@ -71,7 +73,8 @@ src/
 │   ├── ModelParameters/                # 股票模型参数版本管理
 │   ├── PriceObservations/              # 收盘行情快照同步
 │   ├── Dividends/                      # 股息事实同步
-│   └── Analysis/                       # 当前股票分析结果
+│   ├── Financials/                     # 财务事实同步
+│   └── Analysis/                      # 当前股票分析结果
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -191,6 +194,7 @@ SetupAppService
 - `Configurations/ModelParameterSetConfiguration.cs`
 - `Configurations/PriceObservationConfiguration.cs`
 - `Configurations/DividendEventConfiguration.cs`
+- `Configurations/FinancialSnapshotConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -208,6 +212,7 @@ Portfolio 1 ───────────── * PortfolioPosition * ──
 Portfolio 1 ───────────── * ModelParameterSet * ───────────── 1 Security
 Security 1 ───────────── * PriceObservation
 Security 1 ───────────── * DividendEvent
+Security 1 ───────────── * FinancialSnapshot
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -260,7 +265,13 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 批量同步先完成所有事件的身份和领域校验，再统一提交新增事件；空列表表示本次来源没有返回事件，不产生写入。后续 TTM 实际每股股息计算只选择已实施、常规现金且有有效除息日期的事件。
 
-### 8.6 当前股票分析
+### 8.6 财务事实同步
+
+`POST /api/stocks/{securityCode}/{exchangeCode}/financial-snapshots/sync` 通过 `IStockDataProvider.GetFinancialSnapshotsAsync` 获取带数据日期的 FTShare 财务事实，并按 `security_id + data_as_of_date` 幂等保存到 `financial_snapshots`。快照包含盈利、股息支付率、三年平均股息支付率、P/B（PB）、ROE、来源和数据质量。
+
+财务数据缺失或外部服务不可用不会产生部分提交；支付率原始值保留在事实表中，由 Domain 可靠性规则判断是否通过或失败。
+
+### 8.7 当前股票分析
 
 `GET /api/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、最近有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。价格区域按强买入、分批加仓、持有、减仓候选和激进减仓五档返回。
 
@@ -281,7 +292,7 @@ IFtShareMcpToolInvoker
 FtShareMcpToolInvoker ──> official MCP Client ──> FTShare MCP
 ```
 
-`IFtShareMcpToolInvoker` 是 Infrastructure 内部 seam，位于 `Infrastructure/Contracts/`。`FtShareStockDataProvider` 负责 FTShare 返回值到 `StockData` 和 `StockMarketData` DTO 的规范化，只接受 A 股和 CNY 股票资料，并拒绝缺少关键字段或股票身份不匹配的结果。
+`IFtShareMcpToolInvoker` 是 Infrastructure 内部 seam，位于 `Infrastructure/Contracts/`。`FtShareStockDataProvider` 负责 FTShare 返回值到 `StockData`、`StockMarketData`、`StockDividendData` 和 `StockFinancialData` DTO 的规范化，只接受 A 股和 CNY 股票资料，并拒绝缺少关键字段或股票身份不匹配的结果。
 
 MCP 地址、工具名、股票代码参数名、交易所参数名和请求超时通过运行时配置注入。FTShare key 不进入代码、DTO、日志、镜像前端资源或 Git。
 

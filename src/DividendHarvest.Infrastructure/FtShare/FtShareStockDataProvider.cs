@@ -82,11 +82,35 @@ public sealed class FtShareStockDataProvider(
         return ParseDividendData(reference, payload);
     }
 
+    public async Task<IReadOnlyList<StockFinancialData>?> GetFinancialSnapshotsAsync(
+        AShareReference reference,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+
+        var currentOptions = options.Value;
+        ValidateOptions(currentOptions);
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
+            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
+        };
+
+        var payload = await InvokeToolAsync(
+            currentOptions.StockFinancialSnapshotsToolName,
+            arguments,
+            cancellationToken,
+            "FTShare MCP 财务请求超时。",
+            "FTShare MCP 财务数据暂时不可用。");
+        return ParseFinancialData(reference, payload);
+    }
+
     private static void ValidateOptions(FtShareOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.StockProfileToolName)
             || string.IsNullOrWhiteSpace(options.StockMarketDataToolName)
             || string.IsNullOrWhiteSpace(options.StockDividendEventsToolName)
+            || string.IsNullOrWhiteSpace(options.StockFinancialSnapshotsToolName)
             || string.IsNullOrWhiteSpace(options.SecurityCodeArgumentName)
             || string.IsNullOrWhiteSpace(options.ExchangeCodeArgumentName))
         {
@@ -337,6 +361,151 @@ public sealed class FtShareStockDataProvider(
         }
 
         return dividends;
+    }
+
+    private static IReadOnlyList<StockFinancialData>? ParseFinancialData(
+        AShareReference reference,
+        JsonElement? payload)
+    {
+        if (payload is not { } value)
+        {
+            return null;
+        }
+
+        var items = SelectFinancialItems(value);
+        if (items is null)
+        {
+            return null;
+        }
+
+        var snapshots = new List<StockFinancialData>(items.Count);
+        foreach (var item in items)
+        {
+            var snapshot = ParseFinancialItem(reference, item);
+            if (snapshot is null)
+            {
+                return null;
+            }
+
+            snapshots.Add(snapshot);
+        }
+
+        return snapshots;
+    }
+
+    private static StockFinancialData? ParseFinancialItem(
+        AShareReference reference,
+        JsonElement item)
+    {
+        var returnedCode = ReadString(
+            item,
+            "security_code",
+            "stock_code",
+            "code",
+            "symbol");
+        if (returnedCode is not null
+            && NormalizeSecurityCode(returnedCode) != reference.SecurityCode)
+        {
+            return null;
+        }
+
+        var returnedExchange = ReadString(item, "exchange_code", "exchange");
+        if (returnedExchange is not null
+            && NormalizeExchangeCode(returnedExchange) != reference.ExchangeCode)
+        {
+            return null;
+        }
+
+        var dataAsOfDate = ReadDateOnly(
+            item,
+            "data_as_of_date",
+            "financial_date",
+            "period_end_date",
+            "date");
+        var capturedAt = ReadDateTimeOffset(item, "captured_at", "captured_time")
+            ?? DateTimeOffset.UtcNow;
+        var publishedAt = ReadDateTimeOffset(item, "published_at", "published_time");
+        var dataSource = ReadString(item, "data_source", "source");
+        var sourceRecordId = ReadString(
+            item,
+            "source_record_id",
+            "record_id",
+            "id");
+        var dataQualityCode = ReadString(item, "data_quality_code", "quality_code")
+            ?? "valid";
+        if (dataAsOfDate is null || dataSource is null || sourceRecordId is null)
+        {
+            return null;
+        }
+
+        return new StockFinancialData(
+            reference.SecurityCode,
+            reference.ExchangeCode,
+            dataAsOfDate.Value,
+            capturedAt,
+            publishedAt,
+            ReadDecimal(item, "earnings_per_share", "eps"),
+            ReadDecimal(item, "dividend_payout_ratio", "payout_ratio"),
+            ReadDecimal(
+                item,
+                "three_year_average_dividend_payout_ratio",
+                "average_dividend_payout_ratio"),
+            ReadDecimal(item, "price_to_book_ratio", "pb"),
+            ReadDecimal(item, "return_on_equity", "roe"),
+            dataSource,
+            sourceRecordId,
+            dataQualityCode);
+    }
+
+    private static IReadOnlyList<JsonElement>? SelectFinancialItems(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(value.GetString() ?? string.Empty);
+                return SelectFinancialItems(document.RootElement);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        if (value.ValueKind == JsonValueKind.Array)
+        {
+            return value.EnumerateArray().Select(item => item.Clone()).ToArray();
+        }
+
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (HasAnyProperty(
+                value,
+                "data_as_of_date",
+                "financial_date",
+                "period_end_date",
+                "earnings_per_share",
+                "dividend_payout_ratio"))
+        {
+            return [value.Clone()];
+        }
+
+        foreach (var envelopeName in new[] { "data", "result", "financials", "snapshots", "items" })
+        {
+            if (TryGetProperty(value, envelopeName, out var nested))
+            {
+                var items = SelectFinancialItems(nested);
+                if (items is not null)
+                {
+                    return items;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static StockDividendData? ParseDividendItem(

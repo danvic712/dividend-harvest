@@ -18,6 +18,8 @@ internal sealed class DividendHarvestDbContext(DbContextOptions<DividendHarvestD
 
     public DbSet<DividendEvent> DividendEvents => Set<DividendEvent>();
 
+    public DbSet<FinancialSnapshot> FinancialSnapshots => Set<FinancialSnapshot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DividendHarvestDbContext).Assembly);

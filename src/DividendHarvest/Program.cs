@@ -1,6 +1,7 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Analysis;
 using DividendHarvest.Application.Dividends;
+using DividendHarvest.Application.Financials;
 using DividendHarvest.Application.Setup;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Application.ModelParameters;
@@ -28,6 +29,9 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IStockDividendEventAppService,
     StockDividendEventAppService>();
+builder.Services.AddScoped<
+    IStockFinancialSnapshotAppService,
+    StockFinancialSnapshotAppService>();
 builder.Services.AddScoped<IStockAnalysisAppService, StockAnalysisAppService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services

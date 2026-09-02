@@ -12,6 +12,9 @@ public sealed class FtShareOptions
 
     public string StockDividendEventsToolName { get; set; } = "get_stock_dividend_events";
 
+    public string StockFinancialSnapshotsToolName { get; set; } =
+        "get_stock_financial_snapshots";
+
     public string SecurityCodeArgumentName { get; set; } = "security_code";
 
     public string ExchangeCodeArgumentName { get; set; } = "exchange_code";
