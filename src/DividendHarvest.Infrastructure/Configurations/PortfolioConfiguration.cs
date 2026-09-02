@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace DividendHarvest.Infrastructure.Configurations;
 
-public sealed class PortfolioEntityConfiguration : IEntityTypeConfiguration<PortfolioEntity>
+public sealed class PortfolioConfiguration : IEntityTypeConfiguration<Portfolio>
 {
-    public void Configure(EntityTypeBuilder<PortfolioEntity> builder)
+    public void Configure(EntityTypeBuilder<Portfolio> builder)
     {
         builder.ToTable("portfolios");
         builder.HasKey(x => x.Id);

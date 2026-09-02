@@ -1,6 +1,6 @@
 namespace DividendHarvest.Domain.Models;
 
-public sealed class PortfolioPositionEntity
+public sealed class PortfolioPosition
 {
     public Guid PortfolioId { get; set; }
 

@@ -15,7 +15,7 @@ DividendHarvest Host
 └── Infrastructure
     ├── Contracts
     ├── Configurations
-    ├── DataAccess
+    ├── Repositories
     └── FtShare
 
 Application  ──depends on──> Domain
@@ -35,9 +35,9 @@ src/
 │   │   ├── IRepository.cs
 │   │   └── IUow.cs
 │   ├── Models/                         # 数据库实体模型
-│   │   ├── PortfolioEntity.cs
-│   │   ├── PortfolioPositionEntity.cs
-│   │   └── SecurityEntity.cs
+│   │   ├── Portfolio.cs
+│   │   ├── PortfolioPosition.cs
+│   │   └── Security.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   └── Securities/                     # A 股标识领域规则
@@ -52,10 +52,10 @@ src/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
 │   ├── Configurations/                 # EF Core Fluent Entity Configuration
-│   ├── DataAccess/                     # DbContext、Repository、Uow 实现
-│   │   ├── DividendHarvestDbContext.cs
+│   ├── Repositories/                   # Repository、Uow 实现
 │   │   ├── EFRepository.cs
 │   │   └── EFUow.cs
+│   ├── DividendHarvestDbContext.cs     # EF Core DbContext
 │   └── FtShare/                        # FTShare MCP Adapter 实现
 └── DividendHarvest/                    # ASP.NET Core Minimal API Host
 ```
@@ -67,7 +67,7 @@ src/
 3. 所有自定义 Exception 必须位于 `Exceptions/` 文件夹；一个文件只放一个 Exception。
 4. 如果新增枚举，必须放到所属项目的 `Enums/` 文件夹；当前代码没有枚举，不创建空的伪实现。
 5. `Application` 的业务实现类使用 `*AppService` 后缀；对应 Interface 使用 `I*AppService`。
-6. 数据访问实现统一位于 `Infrastructure/DataAccess/`，不使用单独的 `Persistence` 命名层。
+6. 数据访问实现按照 `salary-insights` 拆分到 `Infrastructure/Repositories/` 和 Infrastructure 根目录的 DbContext，不使用单独的 `Persistence` 命名层。
 
 ## 4. Interface 与 DTO 规则
 
@@ -129,9 +129,9 @@ SetupAppService
       ▼
      IUow
       │
-      ├── Get<PortfolioEntity>() ───────┐
-      ├── Get<SecurityEntity>()         │
-      └── Get<PortfolioPositionEntity>()│
+      ├── Get<Portfolio>() ─────────────┐
+      ├── Get<Security>()               │
+      └── Get<PortfolioPosition>()      │
                                        ▼
                               EFUow / EFRepository<TEntity>
                                        │
@@ -145,7 +145,7 @@ SetupAppService
 - `EFUow` 使用按实体类型缓存的 lazy Repository，与 `salary-insights` 的 `ConcurrentDictionary<Type, Lazy<object>>` 模式一致。
 - `EFRepository<TEntity>` 只包装 `DbContext.Set<TEntity>()`，负责查询、包含、添加和删除。
 - `EFUow.CommitAsync` 统一调用 `SaveChangesAsync`；一个用例的多个实体写入在一次提交中完成。
-- `DividendHarvestDbContext`、`EFRepository<TEntity>` 和 `EFUow` 均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
+- `DividendHarvestDbContext` 位于 Infrastructure 根目录；`EFRepository<TEntity>` 和 `EFUow` 位于 `Infrastructure/Repositories/`，均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
 - Host 的 `/readyz` 和启动建库也只能通过 `IUow.CanConnectAsync`、`IUow.EnsureCreatedAsync`，不直接解析 DbContext。
 - 数据库通过 Docker volume 持久化到 `/app/data`；镜像本身不保存用户数据。
 
@@ -153,9 +153,9 @@ SetupAppService
 
 数据库实体位于 `Domain/Models/`，只保存实体状态，不依赖 EF Core。所有表名、列名、长度、精度、索引、主键和外键关系均位于 Infrastructure 的独立 Fluent Configuration 文件中：
 
-- `Configurations/PortfolioEntityConfiguration.cs`
-- `Configurations/PortfolioPositionEntityConfiguration.cs`
-- `Configurations/SecurityEntityConfiguration.cs`
+- `Configurations/PortfolioConfiguration.cs`
+- `Configurations/PortfolioPositionConfiguration.cs`
+- `Configurations/SecurityConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -169,7 +169,7 @@ modelBuilder.ApplyConfigurationsFromAssembly(
 当前基础关系：
 
 ```text
-PortfolioEntity 1 ─────── * PortfolioPositionEntity * ─────── 1 SecurityEntity
+Portfolio 1 ───────────── * PortfolioPosition * ───────────── 1 Security
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -186,7 +186,7 @@ ISetupAppService
         │
         ▼
 SetupAppService
-        ├── IUow.Get<PortfolioEntity>() 检查是否已完成建账
+        ├── IUow.Get<Portfolio>() 检查是否已完成建账
         ├── IStockDataProvider 获取并校验每只 A 股资料
         ├── IUow.Get<TEntity>() 添加组合、股票和期初持仓
         └── IUow.CommitAsync() 一次提交
@@ -241,5 +241,5 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 
 - 外部 FTShare 数据先进入 Infrastructure Adapter，再转换为 Application DTO。
 - 事实数据和建议快照按 `docs/dividend-harvest-quant-model.md` 的 canonical 字段建模。
-- 新增持久化能力先增加对应 Domain Model 和 Fluent Configuration，再通过 `IUow.Get<TEntity>()` 获取通用 Repository；不要从 Host 或 AppService 直接使用 DbContext。
+- 新增持久化能力先增加对应 Domain Model `class` 和 Fluent Configuration，再通过 `IUow.Get<TEntity>()` 获取通用 Repository；不要从 Host 或 AppService 直接使用 DbContext。
 - 新增业务状态代码时使用显式枚举或 `*_code` 约定，并将枚举放入所属项目的 `Enums/` 文件夹。

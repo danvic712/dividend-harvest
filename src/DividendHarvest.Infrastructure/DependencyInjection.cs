@@ -16,9 +16,9 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("Default")
             ?? "Data Source=dividend-harvest.db";
 
-        services.AddDbContext<DataAccess.DividendHarvestDbContext>(options =>
+        services.AddDbContext<DividendHarvestDbContext>(options =>
             options.UseSqlite(connectionString));
-        services.AddScoped<IUow, DataAccess.EFUow>();
+        services.AddScoped<IUow, Repositories.EFUow>();
 
         return services;
     }

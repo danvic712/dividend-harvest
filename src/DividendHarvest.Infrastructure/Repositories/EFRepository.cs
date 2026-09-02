@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using DividendHarvest.Domain.Contracts;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Infrastructure.DataAccess;
+namespace DividendHarvest.Infrastructure.Repositories;
 
 internal sealed class EFRepository<TEntity>(DbContext dbContext) : IRepository<TEntity>
     where TEntity : class

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using DividendHarvest.Domain.Contracts;
 using Microsoft.EntityFrameworkCore;
 
-namespace DividendHarvest.Infrastructure.DataAccess;
+namespace DividendHarvest.Infrastructure.Repositories;
 
 internal sealed class EFUow(DividendHarvestDbContext dbContext) : IUow
 {

@@ -48,8 +48,8 @@ public sealed class SetupAppServiceTests
         provider
             .Setup(x => x.GetAsync(It.Is<AShareReference>(r => r.SecurityCode == "600036"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StockData("600036", "SSE", "招商银行", "A-share", "CNY"));
-        var securityRepository = new Mock<IRepository<SecurityEntity>>();
-        var positionRepository = new Mock<IRepository<PortfolioPositionEntity>>();
+        var securityRepository = new Mock<IRepository<Security>>();
+        var positionRepository = new Mock<IRepository<PortfolioPosition>>();
         var unitOfWork = CreateUnitOfWork(repository, securityRepository, positionRepository);
         var service = new SetupAppService(unitOfWork.Object, provider.Object);
         var request = new SetupRequest(
@@ -65,11 +65,11 @@ public sealed class SetupAppServiceTests
         Assert.Equal(2, result.Stocks.Count);
         Assert.Equal("平安银行", result.Stocks[0].SecurityName);
         repository.Verify(x => x.AddAsync(
-            It.Is<PortfolioEntity>(portfolio => portfolio.Name == "长期股息组合"),
+            It.Is<Portfolio>(portfolio => portfolio.Name == "长期股息组合"),
             It.IsAny<CancellationToken>()), Times.Once);
-        securityRepository.Verify(x => x.AddAsync(It.IsAny<SecurityEntity>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        securityRepository.Verify(x => x.AddAsync(It.IsAny<Security>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         positionRepository.Verify(x => x.AddAsync(
-            It.Is<PortfolioPositionEntity>(position => position.HeldShares == 100 && position.CoreShares == 60),
+            It.Is<PortfolioPosition>(position => position.HeldShares == 100 && position.CoreShares == 60),
             It.IsAny<CancellationToken>()), Times.Once);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -124,7 +124,7 @@ public sealed class SetupAppServiceTests
             CancellationToken.None));
 
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddAsync(It.IsAny<Portfolio>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -146,52 +146,52 @@ public sealed class SetupAppServiceTests
 
         Assert.IsType<StockDataProviderUnavailableException>(exception.InnerException);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
+        repository.Verify(x => x.AddAsync(It.IsAny<Portfolio>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static SetupAppService CreateService(
-        Mock<IRepository<PortfolioEntity>> repository,
+        Mock<IRepository<Portfolio>> repository,
         Mock<IStockDataProvider>? provider = null)
     {
         var unitOfWork = CreateUnitOfWork(repository);
         return new SetupAppService(unitOfWork.Object, (provider ?? new Mock<IStockDataProvider>()).Object);
     }
 
-    private static Mock<IRepository<PortfolioEntity>> CreatePortfolioRepository(bool hasPortfolio)
+    private static Mock<IRepository<Portfolio>> CreatePortfolioRepository(bool hasPortfolio)
     {
-        var repository = new Mock<IRepository<PortfolioEntity>>();
+        var repository = new Mock<IRepository<Portfolio>>();
         repository
             .Setup(x => x.GetQueryable(
                 It.IsAny<bool>(),
-                It.IsAny<Expression<Func<PortfolioEntity, object>>[]>()))
+                It.IsAny<Expression<Func<Portfolio, object>>[]>()))
             .Returns(new[]
             {
                 hasPortfolio
-                    ? new PortfolioEntity { Id = Guid.NewGuid(), Name = "长期股息组合" }
+                    ? new Portfolio { Id = Guid.NewGuid(), Name = "长期股息组合" }
                     : null
             }
             .Where(entity => entity is not null)
-            .Cast<PortfolioEntity>()
+            .Cast<Portfolio>()
             .AsAsyncQueryable());
         return repository;
     }
 
     private static Mock<IUow> CreateUnitOfWork(
-        Mock<IRepository<PortfolioEntity>> portfolioRepository,
-        Mock<IRepository<SecurityEntity>>? securityRepository = null,
-        Mock<IRepository<PortfolioPositionEntity>>? positionRepository = null)
+        Mock<IRepository<Portfolio>> portfolioRepository,
+        Mock<IRepository<Security>>? securityRepository = null,
+        Mock<IRepository<PortfolioPosition>>? positionRepository = null)
     {
-        securityRepository ??= new Mock<IRepository<SecurityEntity>>();
-        positionRepository ??= new Mock<IRepository<PortfolioPositionEntity>>();
+        securityRepository ??= new Mock<IRepository<Security>>();
+        positionRepository ??= new Mock<IRepository<PortfolioPosition>>();
         var unitOfWork = new Mock<IUow>();
         unitOfWork
-            .Setup(x => x.Get<PortfolioEntity>())
+            .Setup(x => x.Get<Portfolio>())
             .Returns(portfolioRepository.Object);
         unitOfWork
-            .Setup(x => x.Get<SecurityEntity>())
+            .Setup(x => x.Get<Security>())
             .Returns(securityRepository.Object);
         unitOfWork
-            .Setup(x => x.Get<PortfolioPositionEntity>())
+            .Setup(x => x.Get<PortfolioPosition>())
             .Returns(positionRepository.Object);
         unitOfWork
             .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))

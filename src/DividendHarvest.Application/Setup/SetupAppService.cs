@@ -15,7 +15,7 @@ public sealed class SetupAppService(
 {
     public async Task<SetupStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var isComplete = await uow.Get<PortfolioEntity>()
+        var isComplete = await uow.Get<Portfolio>()
             .GetQueryable(asNoTracking: true)
             .AnyAsync(cancellationToken);
 
@@ -30,7 +30,7 @@ public sealed class SetupAppService(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (await uow.Get<PortfolioEntity>()
+        if (await uow.Get<Portfolio>()
             .GetQueryable(asNoTracking: true)
             .AnyAsync(cancellationToken))
         {
@@ -101,12 +101,12 @@ public sealed class SetupAppService(
                 initialHolding));
         }
 
-        var portfolioRepository = uow.Get<PortfolioEntity>();
-        var securityRepository = uow.Get<SecurityEntity>();
-        var positionRepository = uow.Get<PortfolioPositionEntity>();
+        var portfolioRepository = uow.Get<Portfolio>();
+        var securityRepository = uow.Get<Security>();
+        var positionRepository = uow.Get<PortfolioPosition>();
 
         await portfolioRepository.AddAsync(
-            new PortfolioEntity
+            new Portfolio
             {
                 Id = portfolioId,
                 Name = portfolioName
@@ -116,7 +116,7 @@ public sealed class SetupAppService(
         foreach (var stock in resolvedStocks)
         {
             await securityRepository.AddAsync(
-                new SecurityEntity
+                new Security
                 {
                     Id = stock.SecurityId,
                     SecurityCode = stock.Reference.SecurityCode,
@@ -130,7 +130,7 @@ public sealed class SetupAppService(
             if (stock.InitialHolding is not null)
             {
                 await positionRepository.AddAsync(
-                    new PortfolioPositionEntity
+                    new PortfolioPosition
                     {
                         PortfolioId = portfolioId,
                         SecurityId = stock.SecurityId,

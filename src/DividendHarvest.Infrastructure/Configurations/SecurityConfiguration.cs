@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace DividendHarvest.Infrastructure.Configurations;
 
-public sealed class SecurityEntityConfiguration : IEntityTypeConfiguration<SecurityEntity>
+public sealed class SecurityConfiguration : IEntityTypeConfiguration<Security>
 {
-    public void Configure(EntityTypeBuilder<SecurityEntity> builder)
+    public void Configure(EntityTypeBuilder<Security> builder)
     {
         builder.ToTable("securities");
         builder.HasKey(x => x.Id);

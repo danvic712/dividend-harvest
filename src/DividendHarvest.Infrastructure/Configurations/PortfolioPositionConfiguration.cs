@@ -4,10 +4,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace DividendHarvest.Infrastructure.Configurations;
 
-public sealed class PortfolioPositionEntityConfiguration
-    : IEntityTypeConfiguration<PortfolioPositionEntity>
+public sealed class PortfolioPositionConfiguration
+    : IEntityTypeConfiguration<PortfolioPosition>
 {
-    public void Configure(EntityTypeBuilder<PortfolioPositionEntity> builder)
+    public void Configure(EntityTypeBuilder<PortfolioPosition> builder)
     {
         builder.ToTable("portfolio_positions");
         builder.HasKey(x => new { x.PortfolioId, x.SecurityId });
@@ -19,11 +19,11 @@ public sealed class PortfolioPositionEntityConfiguration
         builder.Property(x => x.AverageCostPerShare)
             .HasColumnName("average_cost_per_share")
             .HasPrecision(20, 8);
-        builder.HasOne<PortfolioEntity>()
+        builder.HasOne<Portfolio>()
             .WithMany()
             .HasForeignKey(x => x.PortfolioId)
             .OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<SecurityEntity>()
+        builder.HasOne<Security>()
             .WithMany()
             .HasForeignKey(x => x.SecurityId)
             .OnDelete(DeleteBehavior.Restrict);

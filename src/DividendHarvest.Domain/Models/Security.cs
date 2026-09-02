@@ -1,6 +1,6 @@
 namespace DividendHarvest.Domain.Models;
 
-public sealed class SecurityEntity
+public sealed class Security
 {
     public Guid Id { get; set; }
 
