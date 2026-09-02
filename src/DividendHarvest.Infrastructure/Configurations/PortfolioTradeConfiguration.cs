@@ -43,7 +43,7 @@ public sealed class PortfolioTradeConfiguration
         {
             x.PortfolioId,
             x.SourceRecordId
-        });
+        }).IsUnique();
 
         builder.HasOne<Portfolio>()
             .WithMany()

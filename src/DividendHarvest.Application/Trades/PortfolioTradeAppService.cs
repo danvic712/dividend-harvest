@@ -50,6 +50,34 @@ public sealed class PortfolioTradeAppService(
                 reference.ExchangeCode);
         }
 
+        var tradeRepository = uow.Get<PortfolioTrade>();
+        var sourceRecordId = request.SourceRecordId?.Trim();
+        var existingTrade = string.IsNullOrWhiteSpace(sourceRecordId)
+            ? null
+            : await tradeRepository
+                .GetQueryable(asNoTracking: true)
+                .SingleOrDefaultAsync(
+                    item => item.PortfolioId == portfolio.Id
+                        && item.SourceRecordId == sourceRecordId,
+                    cancellationToken);
+        var positionRepository = uow.Get<PortfolioPosition>();
+        var position = await positionRepository
+            .GetQueryable()
+            .SingleOrDefaultAsync(
+                item => item.PortfolioId == portfolio.Id
+                    && item.SecurityId == security.Id,
+                cancellationToken);
+        if (existingTrade is not null)
+        {
+            if (position is null)
+            {
+                throw new PortfolioTradeValidationException(
+                    "已存在的交易记录没有对应的当前持仓。");
+            }
+
+            return ToResult(existingTrade, portfolio, reference, position);
+        }
+
         PortfolioTrade trade;
         try
         {
@@ -68,13 +96,6 @@ public sealed class PortfolioTradeAppService(
             throw new PortfolioTradeValidationException(exception.Message);
         }
 
-        var positionRepository = uow.Get<PortfolioPosition>();
-        var position = await positionRepository
-            .GetQueryable()
-            .SingleOrDefaultAsync(
-                item => item.PortfolioId == portfolio.Id
-                    && item.SecurityId == security.Id,
-                cancellationToken);
         try
         {
             if (trade.TradeDirectionCode == "buy")
@@ -112,7 +133,7 @@ public sealed class PortfolioTradeAppService(
             throw new PortfolioTradeValidationException(exception.Message);
         }
 
-        await uow.Get<PortfolioTrade>().AddAsync(trade, cancellationToken);
+        await tradeRepository.AddAsync(trade, cancellationToken);
         var cashAmount = trade.ShareQuantity * trade.PricePerShare;
         await uow.Get<CashLedgerEntry>().AddAsync(
             CashLedgerEntry.Create(
@@ -140,7 +161,15 @@ public sealed class PortfolioTradeAppService(
 
         await uow.CommitAsync(cancellationToken);
 
-        return new PortfolioTradeResult(
+        return ToResult(trade, portfolio, reference, position);
+    }
+
+    private static PortfolioTradeResult ToResult(
+        PortfolioTrade trade,
+        Portfolio portfolio,
+        AShareReference reference,
+        PortfolioPosition position)
+        => new(
             trade.Id,
             portfolio.Id,
             reference.SecurityCode,
@@ -154,6 +183,5 @@ public sealed class PortfolioTradeAppService(
             position.CoreShares,
             position.TargetShares,
             position.AverageCostPerShare,
-            cashAmount);
-    }
+            trade.ShareQuantity * trade.PricePerShare);
 }

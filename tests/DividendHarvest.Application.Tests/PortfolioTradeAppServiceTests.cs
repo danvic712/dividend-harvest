@@ -156,6 +156,63 @@ public sealed class PortfolioTradeAppServiceTests
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task RecordAsync_returns_existing_trade_for_a_repeated_source_record()
+    {
+        var portfolio = CreatePortfolio();
+        var security = CreateSecurity();
+        var existingTrade = PortfolioTrade.Create(
+            portfolio.Id,
+            security.Id,
+            new DateOnly(2026, 9, 1),
+            "buy",
+            100,
+            4m,
+            5m,
+            "trade-duplicate");
+        var position = new PortfolioPosition
+        {
+            PortfolioId = portfolio.Id,
+            SecurityId = security.Id,
+            HeldShares = 100,
+            CoreShares = 0,
+            TargetShares = 0,
+            AverageCostPerShare = 4.05m
+        };
+        var tradeRepository = CreateRepository([existingTrade]);
+        var positionRepository = CreateRepository([position]);
+        var cashRepository = CreateRepository<CashLedgerEntry>([]);
+        var unitOfWork = CreateUnitOfWork(
+            CreateRepository([portfolio]),
+            CreateRepository([security]),
+            positionRepository,
+            tradeRepository,
+            cashRepository);
+        var service = CreateService(unitOfWork.Object);
+
+        var result = await service.RecordAsync(
+            new RecordPortfolioTradeRequest(
+                security.SecurityCode,
+                security.ExchangeCode,
+                new DateOnly(2026, 9, 1),
+                "buy",
+                100,
+                4m,
+                5m,
+                " trade-duplicate "),
+            CancellationToken.None);
+
+        Assert.Equal(existingTrade.Id, result.PortfolioTradeId);
+        Assert.Equal(100, result.HeldShares);
+        tradeRepository.Verify(x => x.AddAsync(
+            It.IsAny<PortfolioTrade>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        cashRepository.Verify(x => x.AddAsync(
+            It.IsAny<CashLedgerEntry>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static PortfolioTradeAppService CreateService(IUow unitOfWork)
         => new(unitOfWork, new RecordPortfolioTradeRequestValidator());
 

@@ -324,7 +324,7 @@ Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailyS
 
 ### 8.11 交易记录与持仓成本
 
-`POST /api/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；实际卖出只不能超过当前持股，允许真实历史交易使当前持仓低于核心仓。核心仓保护只用于系统生成普通减仓建议，不阻止用户补录已经发生的交易。每次交易与对应买卖现金流水、手续费流水在同一个 UoW 中提交，实际现金余额不会依赖模型股息推算。
+`POST /api/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；实际卖出只不能超过当前持股，允许真实历史交易使当前持仓低于核心仓。核心仓保护只用于系统生成普通减仓建议，不阻止用户补录已经发生的交易。提供 `source_record_id` 时，按组合范围幂等处理重复提交。每次新交易与对应买卖现金流水、手续费流水在同一个 UoW 中提交，实际现金余额不会依赖模型股息推算。
 
 ## 9. FTShare MCP Adapter
 
