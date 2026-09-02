@@ -26,7 +26,16 @@ Domain ──depends on──> nothing in this solution
 
 Host 只负责 HTTP 路由、依赖注入组合和运行时启动；业务规则属于 Application 或 Domain；外部系统和 EF Core 实现属于 Infrastructure。
 
-## 3. Repo 分层布局
+## 3. 运行时配置
+
+Host 项目的配置文件位于 `src/DividendHarvest/`：
+
+- `appsettings.json`：本地开发默认配置，使用工作目录下的 SQLite 文件。
+- `appsettings.Production.json`：生产环境配置，使用 `/app/data/dividend-harvest.db`，适配 Docker volume 持久化。
+
+ASP.NET Core 默认环境名为 `Production`（大小写不敏感）时，会自动加载 `appsettings.Production.json`。环境变量仍作为后置覆盖层，可用于部署时覆盖连接字符串、FTShare MCP 地址和工具参数。两个文件只保存非敏感默认值，FTShare key 不进入源代码、镜像或 Git。
+
+## 4. Repo 分层布局
 
 ```text
 src/
@@ -58,6 +67,8 @@ src/
 │   ├── DividendHarvestDbContext.cs     # EF Core DbContext
 │   └── FtShare/                        # FTShare MCP Adapter 实现
 └── DividendHarvest/                    # ASP.NET Core Controllers Host
+    ├── appsettings.json                # 本地默认配置
+    ├── appsettings.Production.json     # 生产环境配置
     ├── Controllers/                    # 业务 HTTP Controller
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
@@ -71,9 +82,9 @@ src/
 5. `Application` 的业务实现类使用 `*AppService` 后缀；对应 Interface 使用 `I*AppService`。
 6. 数据访问实现按照 `salary-insights` 拆分到 `Infrastructure/Repositories/` 和 Infrastructure 根目录的 DbContext，不使用单独的 `Persistence` 命名层。
 
-## 4. Interface 与 DTO 规则
+## 5. Interface 与 DTO 规则
 
-### 4.1 Contracts 归属
+### 5.1 Contracts 归属
 
 - `Domain/Contracts`：跨层需要依赖的通用持久化抽象，包括 `IRepository<TEntity>` 和 `IUow`。
 - `Application/Contracts`：用例和外部资料能力的抽象，包括 `ISetupAppService` 和 `IStockDataProvider`。
@@ -81,13 +92,13 @@ src/
 
 Application 不认识 EF Core、SQLite、HTTP 或 MCP SDK。Host 只依赖 Application 的 AppService Interface 和 Infrastructure 的组合注册扩展，不直接使用数据访问实现。
 
-### 4.2 DTO
+### 5.2 DTO
 
 Application 的 DTO 位于 `Application/Dtos/`，用于 Controller 与用例之间的输入输出，以及外部资料 Adapter 规范化后的结果。DTO 不承担数据库实体职责，也不包含 Repository、DbContext 或 MCP 客户端。
 
 一个 DTO 文件只能包含一个 DTO 类型，文件名必须与类型名一致。
 
-## 5. Uow 与 Repository 设计
+## 6. Uow 与 Repository 设计
 
 本项目参考 `salary-insights` 的通用 EF Core 数据访问模式，但保留本项目的 `IUow` 命名和“所有数据访问只能通过 Uow”的约束。
 
@@ -152,7 +163,7 @@ SetupAppService
 - Host 的启动建库只能通过 `IUow.EnsureCreatedAsync`，不直接解析 DbContext。
 - 数据库通过 Docker volume 持久化到 `/app/data`；镜像本身不保存用户数据。
 
-## 6. Domain Models 与 Fluent 配置
+## 7. Domain Models 与 Fluent 配置
 
 数据库实体位于 `Domain/Models/`，只保存实体状态，不依赖 EF Core。所有表名、列名、长度、精度、索引、主键和外键关系均位于 Infrastructure 的独立 Fluent Configuration 文件中：
 
@@ -177,7 +188,7 @@ Portfolio 1 ───────────── * PortfolioPosition * ──
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
 
-## 7. Application 用例数据流
+## 8. Application 用例数据流
 
 首次建账的调用路径如下：
 
@@ -197,7 +208,7 @@ SetupAppService
 
 外部资料在进入实体前先被规范化为 Application DTO；DTO 通过校验后才转换为 Domain Model。任何 FTShare 失败都不会产生部分持久化写入。
 
-## 8. FTShare MCP Adapter
+## 9. FTShare MCP Adapter
 
 ```text
 IStockDataProvider
@@ -216,7 +227,7 @@ FtShareMcpToolInvoker ──> official MCP Client ──> FTShare MCP
 
 MCP 地址、工具名、股票代码参数名、交易所参数名和请求超时通过运行时配置注入。FTShare key 不进入代码、DTO、日志、镜像前端资源或 Git。
 
-## 9. Exception 设计
+## 10. Exception 设计
 
 Application 自定义异常统一位于 `Application/Exceptions/`：
 
@@ -227,7 +238,7 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 
 外部异常不会穿透到 HTTP 响应；Host 只把稳定的 Application 异常映射为 400、409 或 503。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 
-## 10. 测试策略
+## 11. 测试策略
 
 测试项目位于 `tests/`，当前只针对 Domain 和 Application 编写单元测试，使用 xUnit + Moq：
 
@@ -238,7 +249,7 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 
 所有测试必须保持对 Interface 的验证，而不是依赖具体实现内部结构。
 
-## 11. 后续扩展
+## 12. 后续扩展
 
 新增行情、股息、财务和建议计算功能时，优先遵守以下边界：
 
