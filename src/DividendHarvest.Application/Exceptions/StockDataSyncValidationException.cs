@@ -1,4 +1,4 @@
 namespace DividendHarvest.Application.Exceptions;
 
-public sealed class StockPriceObservationValidationException(string message)
+public sealed class StockDataSyncValidationException(string message)
     : Exception(message);

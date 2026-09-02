@@ -24,7 +24,7 @@ public sealed class StockPriceObservationAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new StockPriceObservationValidationException(
+            throw new StockDataSyncValidationException(
                 ValidationErrorFormatter.Format(validationResult));
         }
 

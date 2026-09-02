@@ -17,6 +17,7 @@ ASP.NET Core 会在 `Production` 环境下自动加载 `appsettings.Production.j
 FtShare__McpEndpoint=https://<ftshare-mcp-endpoint>/mcp
 FtShare__StockProfileToolName=get_stock_profile
 FtShare__StockMarketDataToolName=get_stock_market_data
+FtShare__StockDividendEventsToolName=get_stock_dividend_events
 FtShare__SecurityCodeArgumentName=security_code
 FtShare__ExchangeCodeArgumentName=exchange_code
 FtShare__RequestTimeoutSeconds=30

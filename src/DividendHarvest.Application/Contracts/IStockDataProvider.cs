@@ -12,4 +12,8 @@ public interface IStockDataProvider
     Task<StockMarketData?> GetMarketDataAsync(
         AShareReference reference,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<StockDividendData>?> GetDividendEventsAsync(
+        AShareReference reference,
+        CancellationToken cancellationToken);
 }

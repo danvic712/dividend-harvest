@@ -48,7 +48,8 @@ src/
 │   │   ├── PortfolioPosition.cs
 │   │   ├── Security.cs
 │   │   ├── ModelParameterSet.cs
-│   │   └── PriceObservation.cs
+│   │   ├── PriceObservation.cs
+│   │   └── DividendEvent.cs
 │   ├── Enums/                          # 枚举；当前暂无枚举
 │   ├── Portfolio/                      # 持仓领域规则
 │   └── Securities/                     # A 股标识领域规则
@@ -58,14 +59,16 @@ src/
 │   │   ├── IStockDataProvider.cs
 │   │   ├── IStockWatchlistAppService.cs
 │   │   ├── IStockModelParameterAppService.cs
-│   │   └── IStockPriceObservationAppService.cs
+│   │   ├── IStockPriceObservationAppService.cs
+│   │   └── IStockDividendEventAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
 │   ├── Setup/                          # AppService 实现和用例编排
 │   ├── Watchlist/                      # 股票关注列表查询
 │   ├── ModelParameters/                # 股票模型参数版本管理
-│   └── PriceObservations/              # 收盘行情快照同步
+│   ├── PriceObservations/              # 收盘行情快照同步
+│   └── Dividends/                      # 股息事实同步
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
 │   │   └── IFtShareMcpToolInvoker.cs
@@ -184,6 +187,7 @@ SetupAppService
 - `Configurations/SecurityConfiguration.cs`
 - `Configurations/ModelParameterSetConfiguration.cs`
 - `Configurations/PriceObservationConfiguration.cs`
+- `Configurations/DividendEventConfiguration.cs`
 
 `DividendHarvestDbContext.OnModelCreating` 使用：
 
@@ -200,6 +204,7 @@ modelBuilder.ApplyConfigurationsFromAssembly(
 Portfolio 1 ───────────── * PortfolioPosition * ───────────── 1 Security
 Portfolio 1 ───────────── * ModelParameterSet * ───────────── 1 Security
 Security 1 ───────────── * PriceObservation
+Security 1 ───────────── * DividendEvent
 ```
 
 组合删除持仓采用级联关系；股票删除持仓采用限制关系；股票的 `ExchangeCode + SecurityCode` 具有唯一索引。
@@ -245,6 +250,12 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 `POST /api/stocks/{securityCode}/{exchangeCode}/price-observations/sync` 通过 `IStockDataProvider.GetMarketDataAsync` 获取 FTShare 规范化的收盘行情，并按 `security_id + trading_date` 幂等保存到 `price_observations`。快照包含收盘价、交易日期、观测时间、来源记录和数据质量代码；缺少价格、日期或来源信息时不会提交数据库。
 
 同一股票同一交易日重复同步时直接返回已有快照，不重复写入。外部行情不可用映射为 503，未配置股票映射为 404，请求参数仍由 FluentValidation 验证。
+
+### 8.5 股息事实同步
+
+`POST /api/stocks/{securityCode}/{exchangeCode}/dividend-events/sync` 通过 `IStockDataProvider.GetDividendEventsAsync` 获取 FTShare 股息事实，并按 `security_id + source_record_id` 幂等保存到 `dividend_events`。事件保留股息类型、实施状态、公告/除息/发放日期、特别股息标记、来源和数据质量，拟派与已取消事件不会在同步阶段被改写为已实施。
+
+批量同步先完成所有事件的身份和领域校验，再统一提交新增事件；空列表表示本次来源没有返回事件，不产生写入。后续 TTM 实际每股股息计算只选择已实施、常规现金且有有效除息日期的事件。
 
 ## 9. FTShare MCP Adapter
 

@@ -59,10 +59,34 @@ public sealed class FtShareStockDataProvider(
         return ParseMarketData(reference, payload);
     }
 
+    public async Task<IReadOnlyList<StockDividendData>?> GetDividendEventsAsync(
+        AShareReference reference,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+
+        var currentOptions = options.Value;
+        ValidateOptions(currentOptions);
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
+            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
+        };
+
+        var payload = await InvokeToolAsync(
+            currentOptions.StockDividendEventsToolName,
+            arguments,
+            cancellationToken,
+            "FTShare MCP 股息请求超时。",
+            "FTShare MCP 股息数据暂时不可用。");
+        return ParseDividendData(reference, payload);
+    }
+
     private static void ValidateOptions(FtShareOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.StockProfileToolName)
             || string.IsNullOrWhiteSpace(options.StockMarketDataToolName)
+            || string.IsNullOrWhiteSpace(options.StockDividendEventsToolName)
             || string.IsNullOrWhiteSpace(options.SecurityCodeArgumentName)
             || string.IsNullOrWhiteSpace(options.ExchangeCodeArgumentName))
         {
@@ -285,6 +309,172 @@ public sealed class FtShareStockDataProvider(
             dataQualityCode);
     }
 
+    private static IReadOnlyList<StockDividendData>? ParseDividendData(
+        AShareReference reference,
+        JsonElement? payload)
+    {
+        if (payload is not { } value)
+        {
+            return null;
+        }
+
+        var items = SelectDividendItems(value);
+        if (items is null)
+        {
+            return null;
+        }
+
+        var dividends = new List<StockDividendData>(items.Count);
+        foreach (var item in items)
+        {
+            var dividend = ParseDividendItem(reference, item);
+            if (dividend is null)
+            {
+                return null;
+            }
+
+            dividends.Add(dividend);
+        }
+
+        return dividends;
+    }
+
+    private static StockDividendData? ParseDividendItem(
+        AShareReference reference,
+        JsonElement item)
+    {
+        var returnedCode = ReadString(
+            item,
+            "security_code",
+            "stock_code",
+            "code",
+            "symbol");
+        if (returnedCode is not null
+            && NormalizeSecurityCode(returnedCode) != reference.SecurityCode)
+        {
+            return null;
+        }
+
+        var returnedExchange = ReadString(item, "exchange_code", "exchange");
+        if (returnedExchange is not null
+            && NormalizeExchangeCode(returnedExchange) != reference.ExchangeCode)
+        {
+            return null;
+        }
+
+        var dividendPerShare = ReadDecimal(
+            item,
+            "dividend_per_share",
+            "cash_dividend_per_share",
+            "amount_per_share",
+            "dividend_amount");
+        var dividendTypeCode = NormalizeDividendType(
+            ReadString(item, "dividend_type_code", "dividend_type", "type"),
+            ReadBool(item, "is_special_dividend"));
+        var dividendStatusCode = NormalizeDividendStatus(
+            ReadString(item, "dividend_status_code", "dividend_status", "status"));
+        var announcementDate = ReadDateOnly(
+            item,
+            "announcement_date",
+            "announced_date");
+        var exDividendDate = ReadDateOnly(
+            item,
+            "ex_dividend_date",
+            "ex_date");
+        var paymentDate = ReadDateOnly(
+            item,
+            "payment_date",
+            "paid_date");
+        var isSpecialDividend = ReadBool(item, "is_special_dividend")
+            ?? string.Equals(dividendTypeCode, "special_cash", StringComparison.Ordinal);
+        var publishedAt = ReadDateTimeOffset(item, "published_at", "published_time");
+        var capturedAt = ReadDateTimeOffset(item, "captured_at", "captured_time")
+            ?? DateTimeOffset.UtcNow;
+        var dataSource = ReadString(item, "data_source", "source");
+        var sourceRecordId = ReadString(
+            item,
+            "source_record_id",
+            "record_id",
+            "id");
+        var dataQualityCode = ReadString(item, "data_quality_code", "quality_code")
+            ?? "valid";
+
+        if (dividendPerShare is null
+            || dividendTypeCode is null
+            || dividendStatusCode is null
+            || dataSource is null
+            || sourceRecordId is null)
+        {
+            return null;
+        }
+
+        return new StockDividendData(
+            reference.SecurityCode,
+            reference.ExchangeCode,
+            dividendPerShare.Value,
+            dividendTypeCode,
+            dividendStatusCode,
+            announcementDate,
+            exDividendDate,
+            paymentDate,
+            isSpecialDividend,
+            publishedAt,
+            capturedAt,
+            dataSource,
+            sourceRecordId,
+            dataQualityCode);
+    }
+
+    private static IReadOnlyList<JsonElement>? SelectDividendItems(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(value.GetString() ?? string.Empty);
+                return SelectDividendItems(document.RootElement);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        if (value.ValueKind == JsonValueKind.Array)
+        {
+            return value.EnumerateArray().Select(item => item.Clone()).ToArray();
+        }
+
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (HasAnyProperty(
+                value,
+                "dividend_per_share",
+                "cash_dividend_per_share",
+                "amount_per_share",
+                "dividend_amount"))
+        {
+            return [value.Clone()];
+        }
+
+        foreach (var envelopeName in new[] { "data", "result", "dividends", "events", "items" })
+        {
+            if (TryGetProperty(value, envelopeName, out var nested))
+            {
+                var items = SelectDividendItems(nested);
+                if (items is not null)
+                {
+                    return items;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private static string? ReadString(JsonElement value, params string[] propertyNames)
     {
         foreach (var propertyName in propertyNames)
@@ -368,6 +558,62 @@ public sealed class FtShareStockDataProvider(
                 out var observedAt)
             ? observedAt
             : null;
+    }
+
+    private static bool? ReadBool(JsonElement value, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (!TryGetProperty(value, propertyName, out var property))
+            {
+                continue;
+            }
+
+            if (property.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                return property.GetBoolean();
+            }
+
+            if (property.ValueKind == JsonValueKind.String
+                && bool.TryParse(property.GetString(), out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? NormalizeDividendType(string? value, bool? isSpecialDividend)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        if (normalized is "special_cash" or "special" or "special cash")
+        {
+            return "special_cash";
+        }
+
+        if (normalized is "regular_cash" or "regular" or "cash" or "regular cash")
+        {
+            return "regular_cash";
+        }
+
+        return isSpecialDividend switch
+        {
+            true => "special_cash",
+            false => "regular_cash",
+            _ => null
+        };
+    }
+
+    private static string? NormalizeDividendStatus(string? value)
+    {
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "implemented" or "paid" or "completed" or "actual" => "implemented",
+            "proposed" or "announced" or "pending" => "proposed",
+            "cancelled" or "canceled" => "cancelled",
+            _ => null
+        };
     }
 
     private static string NormalizeSecurityCode(string value)

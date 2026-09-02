@@ -135,7 +135,7 @@ public sealed class StockPriceObservationAppServiceTests
         var provider = new Mock<IStockDataProvider>();
         var service = CreateService(unitOfWork.Object, provider.Object);
 
-        await Assert.ThrowsAsync<StockPriceObservationValidationException>(() =>
+        await Assert.ThrowsAsync<StockDataSyncValidationException>(() =>
             service.SyncAsync(
                 new SyncStockPriceRequest("123", "NYSE"),
                 CancellationToken.None));

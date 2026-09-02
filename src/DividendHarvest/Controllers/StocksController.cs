@@ -9,7 +9,8 @@ namespace DividendHarvest.Controllers;
 public sealed class StocksController(
     IStockWatchlistAppService stockWatchlistAppService,
     IStockModelParameterAppService stockModelParameterAppService,
-    IStockPriceObservationAppService stockPriceObservationAppService)
+    IStockPriceObservationAppService stockPriceObservationAppService,
+    IStockDividendEventAppService stockDividendEventAppService)
     : ControllerBase
 {
     [HttpGet]
@@ -58,6 +59,18 @@ public sealed class StocksController(
     {
         var result = await stockPriceObservationAppService.SyncAsync(
             new SyncStockPriceRequest(securityCode, exchangeCode),
+            cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{securityCode}/{exchangeCode}/dividend-events/sync")]
+    public async Task<ActionResult<IReadOnlyList<StockDividendEventResult>>> SyncDividendEvents(
+        string securityCode,
+        string exchangeCode,
+        CancellationToken cancellationToken)
+    {
+        var result = await stockDividendEventAppService.SyncAsync(
+            new SyncStockDividendsRequest(securityCode, exchangeCode),
             cancellationToken);
         return Ok(result);
     }

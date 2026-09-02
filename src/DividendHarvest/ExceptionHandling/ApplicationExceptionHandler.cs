@@ -17,8 +17,8 @@ public sealed class ApplicationExceptionHandler(
         {
             SetupValidationException => (StatusCodes.Status400BadRequest, "建账请求无效"),
             ModelParameterValidationException => (StatusCodes.Status400BadRequest, "股票模型参数无效"),
-            StockPriceObservationValidationException =>
-                (StatusCodes.Status400BadRequest, "股票行情同步请求无效"),
+            StockDataSyncValidationException =>
+                (StatusCodes.Status400BadRequest, "股票同步请求无效"),
             SetupAlreadyCompletedException => (StatusCodes.Status409Conflict, "系统已经完成建账"),
             SetupNotCompletedException => (StatusCodes.Status409Conflict, "系统尚未完成建账"),
             ModelParameterVersionAlreadyExistsException =>
@@ -26,6 +26,8 @@ public sealed class ApplicationExceptionHandler(
             StockNotConfiguredException => (StatusCodes.Status404NotFound, "股票尚未配置"),
             StockMarketDataUnavailableException =>
                 (StatusCodes.Status503ServiceUnavailable, "股票行情数据暂时不可用"),
+            StockDividendDataUnavailableException =>
+                (StatusCodes.Status503ServiceUnavailable, "股票股息数据暂时不可用"),
             StockDataUnavailableException => (StatusCodes.Status503ServiceUnavailable, "股票基础资料不可用"),
             _ => ((int StatusCode, string Title)?)null
         };
