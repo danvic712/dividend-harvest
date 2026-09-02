@@ -54,7 +54,7 @@ public sealed class PortfolioTradeTests
     }
 
     [Fact]
-    public void Position_sell_rejects_breaking_the_core_position()
+    public void Position_sell_allows_recording_an_actual_trade_below_core_position()
     {
         var position = new PortfolioPosition
         {
@@ -63,6 +63,8 @@ public sealed class PortfolioTradeTests
             AverageCostPerShare = 3m
         };
 
-        Assert.Throws<InvalidOperationException>(() => position.ApplySell(50));
+        position.ApplySell(50);
+
+        Assert.Equal(50, position.HeldShares);
     }
 }

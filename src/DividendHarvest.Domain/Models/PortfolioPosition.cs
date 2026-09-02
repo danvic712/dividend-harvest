@@ -65,11 +65,6 @@ public sealed class PortfolioPosition
             throw new InvalidOperationException("卖出股数不能超过当前持股数量。");
         }
 
-        if (HeldShares - shareQuantity < CoreShares)
-        {
-            throw new InvalidOperationException("卖出后不能低于核心仓数量。");
-        }
-
         HeldShares -= shareQuantity;
         if (HeldShares == 0)
         {

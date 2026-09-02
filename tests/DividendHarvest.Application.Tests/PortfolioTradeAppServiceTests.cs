@@ -144,7 +144,7 @@ public sealed class PortfolioTradeAppServiceTests
                 security.ExchangeCode,
                 new DateOnly(2026, 9, 1),
                 "sell",
-                101,
+                201,
                 5m,
                 0m,
                 null),
