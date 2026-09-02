@@ -1,24 +1,28 @@
+using System.Reflection;
+
 namespace DividendHarvest.Application.Exceptions;
 
 public abstract class ApplicationExceptionBase : Exception
 {
     protected ApplicationExceptionBase(
-        string errorCode,
         Exception? innerException = null)
-        : this(errorCode, new Dictionary<string, object?>(), innerException)
+        : this(new Dictionary<string, object?>(), innerException)
     {
     }
 
     protected ApplicationExceptionBase(
-        string errorCode,
         IReadOnlyDictionary<string, object?> parameters,
         Exception? innerException = null)
-        : base(errorCode, innerException)
+        : base(null, innerException)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
         ArgumentNullException.ThrowIfNull(parameters);
 
-        ErrorCode = errorCode;
+        var errorCodeAttribute = GetType().GetCustomAttribute<ApplicationErrorCodeAttribute>()
+            ?? throw new InvalidOperationException(
+                $"Application exception '{GetType().FullName}' must declare {nameof(ApplicationErrorCodeAttribute)}.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCodeAttribute.ErrorCode);
+
+        ErrorCode = errorCodeAttribute.ErrorCode;
         Parameters = parameters.ToDictionary(
             parameter => parameter.Key,
             parameter => parameter.Value,
@@ -28,4 +32,6 @@ public abstract class ApplicationExceptionBase : Exception
     public string ErrorCode { get; }
 
     public IReadOnlyDictionary<string, object?> Parameters { get; }
+
+    public override string Message => ErrorCode;
 }

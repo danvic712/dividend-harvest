@@ -77,8 +77,7 @@ public sealed class PortfolioTradeAppService(
 
             if (position is null)
             {
-                throw new PortfolioTradeValidationException(
-                    "已存在的交易记录没有对应的当前持仓。");
+                throw new PortfolioPositionMissingForTradeException();
             }
 
             return ToResult(existingTrade, portfolio, reference, position);
@@ -127,7 +126,7 @@ public sealed class PortfolioTradeAppService(
             }
             else if (position is null)
             {
-                throw new PortfolioTradeValidationException("卖出交易没有对应的当前持仓。");
+                throw new PortfolioPositionMissingForTradeException();
             }
             else
             {

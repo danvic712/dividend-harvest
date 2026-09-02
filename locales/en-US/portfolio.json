@@ -16,6 +16,11 @@
     "detail": "{message}",
     "validation_message": "Please review the portfolio trade request fields and try again."
   },
+  "portfolio_position_missing_for_trade": {
+    "status_code": 400,
+    "title": "The portfolio trade is invalid",
+    "detail": "The trade has no corresponding current position."
+  },
   "portfolio_trade_conflict": {
     "status_code": 409,
     "title": "The portfolio trade source record conflicts",

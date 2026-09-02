@@ -16,6 +16,11 @@
     "detail": "{message}",
     "validation_message": null
   },
+  "portfolio_position_missing_for_trade": {
+    "status_code": 400,
+    "title": "交易记录无效",
+    "detail": "交易没有对应的当前持仓。"
+  },
   "portfolio_trade_conflict": {
     "status_code": 409,
     "title": "交易来源记录已存在冲突",

@@ -2,4 +2,4 @@ namespace DividendHarvest.Application.Exceptions;
 
 [ApplicationErrorCode("stock_data_sync_validation_failed")]
 public sealed class StockDataSyncValidationException(string message)
-    : ApplicationValidationException("stock_data_sync_validation_failed", message);
+    : ApplicationValidationException(message);

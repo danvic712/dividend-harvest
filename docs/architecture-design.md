@@ -429,7 +429,7 @@ Application 自定义异常统一位于 `Application/Exceptions/`：
 - `StockDataProviderUnavailableException`：外部资料 Adapter 的连接、协议或配置失败，由 Setup 用例转换为 `StockDataUnavailableException`。
 - `CashLedgerEntryConflictException` 和 `PortfolioTradeConflictException`：同一组合的 `source_record_id` 已存在，但请求内容不一致。
 
-所有 Application 异常都携带稳定的 `error_code` 和供文本插值使用的结构化参数；异常类型不保存固定的用户界面文案，验证异常只保留统一验证器产生的结构化诊断。`locales/{culture}/{domain}.json` 为每个错误码定义 HTTP 状态、标题和详情，Application 的 `IApplicationErrorCatalog` 负责加载嵌入式资源、校验各语言错误码集合并执行语言选择与参数插值。
+所有 Application 异常都通过 `ApplicationErrorCodeAttribute` 声明稳定的 `error_code`，并携带供文本插值使用的结构化参数；异常类型不保存固定的用户界面文案，验证异常只保留统一验证器产生的结构化诊断。`locales/{culture}/{domain}.json` 为每个错误码定义 HTTP 状态、标题和详情，Application 的 `IApplicationErrorCatalog` 负责加载嵌入式资源、校验各语言错误码集合并执行语言选择与参数插值。
 
 Host 的 `ApplicationExceptionHandler` 只负责把错误目录解析出的结果写成 ProblemDetails：验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503，并通过扩展返回 `error_code` 和 `locale`。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；内部日志仍可通过结构化日志记录稳定错误码和状态。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 

@@ -114,6 +114,7 @@ public sealed class ApplicationErrorCatalogTests
             new BudgetValidationException("validation"),
             new CashLedgerEntryConflictException("cash-1"),
             new PortfolioTradeValidationException("validation"),
+            new PortfolioPositionMissingForTradeException(),
             new PortfolioTradeConflictException("trade-1")
         ];
 

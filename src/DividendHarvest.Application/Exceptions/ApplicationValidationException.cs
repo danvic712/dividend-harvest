@@ -1,10 +1,7 @@
 namespace DividendHarvest.Application.Exceptions;
 
-public abstract class ApplicationValidationException(
-    string errorCode,
-    string message)
+public abstract class ApplicationValidationException(string message)
     : ApplicationExceptionBase(
-        errorCode,
         new Dictionary<string, object?>
         {
             ["message"] = message
