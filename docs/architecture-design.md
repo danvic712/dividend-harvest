@@ -78,6 +78,7 @@ src/
 │   ├── Dtos/                           # 所有 Application DTO
 │   ├── Exceptions/                     # 所有 Application 自定义 Exception
 │   ├── Validators/                     # FluentValidation 请求验证器
+│   ├── ApplicationServiceCollectionExtensions.cs
 │   ├── Setup/                          # AppService 实现和用例编排
 │   ├── Stocks/                         # 股票资料、关注列表和交易日数据同步
 │   │   ├── StockWatchlistAppService.cs
@@ -101,6 +102,7 @@ src/
 │   ├── Repositories/                   # Repository、Uow 实现
 │   │   ├── EFRepository.cs
 │   │   └── EFUow.cs
+│   ├── InfrastructureServiceCollectionExtensions.cs
 │   ├── DividendHarvestDbContext.cs     # EF Core DbContext
 │   └── FtShare/                        # FTShare MCP Adapter 实现
 └── DividendHarvest/                    # ASP.NET Core Controllers Host
@@ -114,12 +116,16 @@ src/
     │   └── PortfolioController.cs
     ├── Background/                     # ASP.NET Core 后台调度
     │   └── DailyStockDataSyncHostedService.cs
+    ├── HostServiceCollectionExtensions.cs
+    ├── WebApplicationExtensions.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
 Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 Interface：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和异常语义；单股分析与组合建议也保持独立。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。
 
 `Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
+
+各层的依赖注入通过对应的扩展类集中注册：Application 使用 `ApplicationServiceCollectionExtensions.AddDividendHarvestApplication`，Infrastructure 使用 `InfrastructureServiceCollectionExtensions.AddDividendHarvestInfrastructure`，Host 使用 `HostServiceCollectionExtensions.AddDividendHarvestHost`。Host 对 `WebApplication` 的异常处理中间件、Controller/健康检查路由和数据库初始化统一放在 `WebApplicationExtensions`；`Program.cs` 只保留配置构建、扩展调用、应用构建和启动顺序。
 
 约束：
 

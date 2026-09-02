@@ -7,9 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DividendHarvest.Infrastructure;
 
-public static class DependencyInjection
+public static class InfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddDividendHarvestDataAccess(
+    public static IServiceCollection AddDividendHarvestInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
     {
@@ -20,13 +20,6 @@ public static class DependencyInjection
             options.UseSqlite(connectionString));
         services.AddScoped<IUow, Repositories.EFUow>();
 
-        return services;
-    }
-
-    public static IServiceCollection AddFtShareStockDataProvider(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
         services
             .AddOptions<FtShare.FtShareOptions>()
             .Bind(configuration.GetSection(FtShare.FtShareOptions.SectionName));
