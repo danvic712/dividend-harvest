@@ -36,7 +36,7 @@ public static class PortfolioBudgetCalculator
         ArgumentNullException.ThrowIfNull(entries);
 
         return entries
-            .Sum(entry => entry.CashDirectionCode == "inflow"
+            .Sum(entry => entry.CashDirectionCode == CashLedgerCodes.Inflow
                 ? entry.CashAmount
                 : -entry.CashAmount);
     }

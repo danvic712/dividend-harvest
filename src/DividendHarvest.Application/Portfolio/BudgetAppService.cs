@@ -138,10 +138,10 @@ public sealed class BudgetAppService(
                 entry => entry.PortfolioId == portfolio.Id,
                 cancellationToken: cancellationToken);
         var totalInflow = entries
-            .Where(entry => entry.CashDirectionCode == "inflow")
+            .Where(entry => entry.CashDirectionCode == CashLedgerCodes.Inflow)
             .Sum(entry => entry.CashAmount);
         var totalOutflow = entries
-            .Where(entry => entry.CashDirectionCode == "outflow")
+            .Where(entry => entry.CashDirectionCode == CashLedgerCodes.Outflow)
             .Sum(entry => entry.CashAmount);
 
         return new BudgetSummary(

@@ -61,13 +61,17 @@ public sealed class RecordCashLedgerEntryRequestValidator
         RuleFor(x => x.SecurityCode)
             .NotEmpty()
             .When(x => x.EntryTypeCode?.Trim().ToLowerInvariant() is
-                "buy" or "sell" or "dividend_received")
+                CashLedgerCodes.Buy or
+                CashLedgerCodes.Sell or
+                CashLedgerCodes.DividendReceived)
             .WithMessage("买入、卖出和实际收到股息的流水必须关联股票。");
 
         RuleFor(x => x.ExchangeCode)
             .NotEmpty()
             .When(x => x.EntryTypeCode?.Trim().ToLowerInvariant() is
-                "buy" or "sell" or "dividend_received")
+                CashLedgerCodes.Buy or
+                CashLedgerCodes.Sell or
+                CashLedgerCodes.DividendReceived)
             .WithMessage("买入、卖出和实际收到股息的流水必须关联交易所。");
     }
 

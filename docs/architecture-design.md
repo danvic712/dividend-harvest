@@ -441,7 +441,7 @@ Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailyS
 
 ### 8.11 交易记录与持仓成本
 
-`POST /api/v1/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；实际卖出只不能超过当前持股，允许真实历史交易使当前持仓低于核心仓。核心仓保护只用于系统生成普通减仓建议，不阻止用户补录已经发生的交易。提供 `source_record_id` 时，按组合范围幂等处理重复提交；同一来源标识如果对应不同股票、日期、方向、股数、价格或手续费，返回 409 冲突而不是静默复用。交易响应中的 `TradePrincipalAmount` 只表示成交本金，手续费单独由 `TransactionFeeAmount` 表示。每次新交易与对应买卖现金流水、手续费流水在同一个 UoW 中提交，自动流水来源标识使用 `portfolio_trade:{trade_id}:principal` 或 `portfolio_trade:{trade_id}:fee`，实际现金余额不会依赖模型股息推算。
+`POST /api/v1/portfolio/trades` 通过 `IPortfolioTradeAppService` 记录已发生的买入或卖出。买入会按成交价、数量和手续费重算加权平均成本；实际卖出只不能超过当前持股，允许真实历史交易使当前持仓低于核心仓。核心仓保护只用于系统生成普通减仓建议，不阻止用户补录已经发生的交易。提供 `source_record_id` 时，按组合范围幂等处理重复提交；同一来源标识如果对应不同股票、日期、方向、股数、价格或手续费，返回 409 冲突而不是静默复用。交易响应中的 `TradePrincipalAmount` 只表示成交本金，手续费单独由 `TransactionFeeAmount` 表示。`PortfolioTradeCashLedger` 是交易现金影响的唯一 Domain 策略：买入本金是 outflow，卖出本金是 inflow，手续费始终是独立的 fee/outflow。每次新交易与策略生成的现金流水在同一个 UoW 中提交，自动流水来源标识使用 `portfolio_trade:{trade_id}:principal` 或 `portfolio_trade:{trade_id}:fee`；`BudgetAppService` 只负责用户实际现金事实的录入和摘要查询，不能再次推导交易现金影响。
 
 ## 9. FTShare MCP Adapter
 

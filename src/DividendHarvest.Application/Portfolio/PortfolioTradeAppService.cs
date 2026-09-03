@@ -107,7 +107,7 @@ public sealed class PortfolioTradeAppService(
 
         try
         {
-            if (trade.TradeDirectionCode == "buy")
+            if (trade.TradeDirectionCode == TradeDirectionCodes.Buy)
             {
                 if (position is null)
                 {
@@ -146,29 +146,10 @@ public sealed class PortfolioTradeAppService(
         }
 
         await tradeRepository.AddAsync(trade, cancellationToken);
-        var cashAmount = trade.ShareQuantity * trade.PricePerShare;
-        await uow.Get<CashLedgerEntry>().AddAsync(
-            CashLedgerEntry.Create(
-                portfolio.Id,
-                security.Id,
-                trade.TradeDate,
-                trade.TradeDirectionCode,
-                trade.TradeDirectionCode == "buy" ? "outflow" : "inflow",
-                cashAmount,
-                $"portfolio_trade:{trade.Id}:principal"),
-            cancellationToken);
-        if (trade.TransactionFeeAmount > 0)
+        var cashLedgerRepository = uow.Get<CashLedgerEntry>();
+        foreach (var cashEntry in PortfolioTradeCashLedger.CreateEntries(trade))
         {
-            await uow.Get<CashLedgerEntry>().AddAsync(
-                CashLedgerEntry.Create(
-                    portfolio.Id,
-                    security.Id,
-                    trade.TradeDate,
-                    "fee",
-                    "outflow",
-                    trade.TransactionFeeAmount,
-                    $"portfolio_trade:{trade.Id}:fee"),
-                cancellationToken);
+            await cashLedgerRepository.AddAsync(cashEntry, cancellationToken);
         }
 
         try
