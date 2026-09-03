@@ -1,11 +1,15 @@
-.budget-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr); gap: 16px; }
-.budget-form-card, .budget-summary-card { padding: 23px; }
-.cash-balance { padding: 24px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground); }
-.cash-balance span { color: color-mix(in srgb, var(--primary-foreground) 70%, transparent); font-size: 12px; }
-.cash-balance strong { display: block; margin-top: 9px; font-size: 38px; letter-spacing: -0.05em; }
+.budget-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 16px; align-items: start; }
+.budget-form-card, .budget-summary-card { padding: 25px; }
+.budget-form-card { background: color-mix(in srgb, var(--card) 92%, transparent); }
+.budget-summary-card { background: color-mix(in srgb, var(--card) 78%, transparent); }
+.cash-balance { position: relative; overflow: hidden; padding: 25px; border: 1px solid color-mix(in srgb, var(--primary-foreground) 16%, transparent); border-radius: 9px; background: var(--primary); color: var(--primary-foreground); }
+.cash-balance::after { position: absolute; right: -55px; bottom: -90px; width: 220px; height: 220px; border: 1px solid color-mix(in srgb, var(--primary-foreground) 20%, transparent); border-radius: 50%; box-shadow: 0 0 0 24px color-mix(in srgb, var(--primary-foreground) 5%, transparent); content: ""; }
+.cash-balance span { position: relative; z-index: 1; color: color-mix(in srgb, var(--primary-foreground) 72%, transparent); font-size: 11px; }
+.cash-balance strong { position: relative; z-index: 1; display: block; margin-top: 9px; font-size: 38px; font-weight: 500; letter-spacing: -.07em; }
 .budget-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
-.budget-mini { padding: 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--background); }
-.budget-mini span { display: block; color: var(--muted-foreground); font-size: 11px; }
-.budget-mini strong { display: block; margin-top: 6px; font-size: 16px; }
+.budget-mini { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--background) 75%, var(--card)); }
+.budget-mini span { display: block; color: var(--muted-foreground); font-size: 10px; }
+.budget-mini strong { display: block; margin-top: 7px; color: var(--foreground); font-size: 16px; font-weight: 600; }
 
 @media (max-width: 900px) { .budget-layout { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .budget-form-card, .budget-summary-card { padding: 19px; } .budget-mini-grid { grid-template-columns: 1fr; } }

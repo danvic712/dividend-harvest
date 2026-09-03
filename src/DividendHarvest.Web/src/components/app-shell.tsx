@@ -12,6 +12,7 @@ type AppShellProps = {
   currentPath: string
   onNavigate: (path: string) => void
   lastUpdated?: string | null
+  dataState?: "synced" | "pending" | "unknown"
 }
 
 const navigation = [
@@ -21,9 +22,10 @@ const navigation = [
   { path: "/portfolio", label: copy.nav.portfolio, icon: WalletCards },
 ]
 
-export function AppShell({ children, currentPath, onNavigate, lastUpdated }: AppShellProps) {
+export function AppShell({ children, currentPath, onNavigate, lastUpdated, dataState = "unknown" }: AppShellProps) {
   const { theme, setTheme } = useTheme()
   const [locale, setLocale] = useState(() => localStorage.getItem("dividend-harvest-locale") ?? "zh-CN")
+  const dataLabel = dataState === "synced" ? "FTShare 已同步" : dataState === "pending" ? "FTShare 后台同步中" : "FTShare · 按交易日更新"
 
   function updateLocale(nextLocale: string) {
     localStorage.setItem("dividend-harvest-locale", nextLocale)
@@ -58,7 +60,7 @@ export function AppShell({ children, currentPath, onNavigate, lastUpdated }: App
         </nav>
 
         <div className="topbar-actions d-header-actions">
-          <div className="data-stamp"><span className="data-dot" /><span>FTShare 已同步</span><span className="data-divider">·</span><span>{lastUpdated ?? "每交易日"}</span></div>
+          <div className={`data-stamp data-stamp-${dataState}`}><span className="data-dot" /><span>{dataLabel}</span><span className="data-divider">·</span><span>{lastUpdated ?? "每交易日"}</span></div>
           <div className="theme-control" aria-label="主题设置">
             {([{"value": "light", "label": "日间"}, {"value": "dark", "label": "夜间"}, {"value": "system", "label": "系统"}] as Array<{ value: Theme; label: string }>).map((option) => <button key={option.value} type="button" aria-pressed={theme === option.value} className={theme === option.value ? "theme-control-active" : ""} onClick={() => setTheme(option.value)}>{option.label}</button>)}
           </div>
@@ -85,7 +87,7 @@ export function AppShell({ children, currentPath, onNavigate, lastUpdated }: App
 
       <footer className="app-footer">
         <div><span className="footer-rule" />{copy.disclaimer}</div>
-        <div className="footer-meta"><CalendarClock size={14} />{lastUpdated ? `数据更新时间 ${lastUpdated}` : "数据按交易日更新"}<Badge variant="outline">仅 A 股</Badge></div>
+        <div className="footer-meta"><CalendarClock size={14} />{lastUpdated ? `数据更新时间 ${lastUpdated}` : "数据按交易日更新"}<Badge variant="outline">仅 A 股</Badge><Badge variant="outline">仅供研究</Badge></div>
       </footer>
     </div>
   )

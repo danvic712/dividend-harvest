@@ -1,9 +1,11 @@
-.settings-card { max-width: 1120px; padding: 24px; }
-.settings-stock-tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 22px; padding-bottom: 5px; }
-.settings-stock-tab { flex: 0 0 auto; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--muted-foreground); font-size: 12px; }
-.settings-stock-tab-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
-.settings-group { padding-top: 19px; border-top: 1px solid var(--border); }
-.settings-group h3 { margin: 0 0 14px; font-family: var(--font-heading); font-size: 19px; font-weight: 500; }
-.settings-group + .settings-group { margin-top: 25px; }
+.settings-card { max-width: 1180px; padding: 25px; background: color-mix(in srgb, var(--card) 90%, transparent); }
+.settings-stock-tabs { display: flex; align-items: center; gap: 8px; overflow-x: auto; margin-bottom: 25px; padding-bottom: 9px; border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.settings-tabs-label { flex: 0 0 auto; margin: 0 8px 0 0; color: var(--attention-strong); white-space: nowrap; }
+.settings-stock-tab { flex: 0 0 auto; min-height: 36px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--background); color: var(--muted-foreground); font-size: 11px; transition: background 160ms ease, border-color 160ms ease, color 160ms ease; }
+.settings-stock-tab:hover { border-color: var(--accent); color: var(--foreground); }
+.settings-stock-tab-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
+.settings-group { padding-top: 20px; border-top: 1px solid var(--border); }
+.settings-group h3 { margin: 0 0 14px; color: var(--foreground); font-family: var(--font-heading); font-size: 20px; font-weight: 400; letter-spacing: -.04em; }
+.settings-group + .settings-group { margin-top: 28px; }
 
-@media (max-width: 700px) { .settings-card { padding: 18px; } }
+@media (max-width: 700px) { .settings-card { padding: 19px; } .settings-tabs-label { display: none; } }

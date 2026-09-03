@@ -1,14 +1,20 @@
-.portfolio-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.62fr); gap: 16px; }
-.portfolio-form-card, .portfolio-result-card { padding: 23px; }
+.portfolio-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 16px; align-items: start; }
+.portfolio-form-card, .portfolio-result-card { padding: 25px; }
+.portfolio-form-card { background: color-mix(in srgb, var(--card) 92%, transparent); }
+.portfolio-result-card { background: color-mix(in srgb, var(--card) 78%, transparent); }
 .trade-direction { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.direction-button { display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border: 1px solid var(--border); border-radius: 7px; background: var(--background); color: var(--muted-foreground); font-size: 13px; }
+.direction-button { display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border: 1px solid var(--border); border-radius: 7px; background: var(--background); color: var(--muted-foreground); font-size: 13px; transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease; }
+.direction-button:hover { border-color: var(--accent); color: var(--foreground); transform: translateY(-1px); }
 .direction-button-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
 .trade-result { display: grid; gap: 13px; }
-.trade-result-main { padding: 17px; border-radius: 10px; background: var(--primary); color: var(--primary-foreground); }
-.trade-result-main span { color: color-mix(in srgb, var(--primary-foreground) 70%, transparent); font-size: 11px; }
-.trade-result-main strong { display: block; margin-top: 7px; font-size: 30px; letter-spacing: -0.04em; }
+.trade-result-main { position: relative; overflow: hidden; padding: 20px 17px; border-radius: 9px; background: var(--primary); color: var(--primary-foreground); }
+.trade-result-main::after { position: absolute; right: -30px; bottom: -70px; width: 170px; height: 170px; border: 1px solid color-mix(in srgb, var(--primary-foreground) 24%, transparent); border-radius: 50%; content: ""; }
+.trade-result-main span, .trade-result-main small { position: relative; z-index: 1; display: block; color: color-mix(in srgb, var(--primary-foreground) 72%, transparent); font-size: 11px; }
+.trade-result-main strong { position: relative; z-index: 1; display: block; margin-top: 7px; font-size: 30px; font-weight: 500; letter-spacing: -.06em; }
+.trade-result-main small { margin-top: 8px; color: color-mix(in srgb, var(--primary-foreground) 62%, transparent); font-size: 10px; }
 .result-list { display: grid; gap: 10px; }
 .result-list .data-line { padding-bottom: 10px; }
 .text-link { border: 0; background: transparent; color: var(--accent-strong); text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 900px) { .portfolio-layout { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .portfolio-form-card, .portfolio-result-card { padding: 19px; } }
