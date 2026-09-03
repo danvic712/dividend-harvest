@@ -1,0 +1,11 @@
+.budget-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr); gap: 16px; }
+.budget-form-card, .budget-summary-card { padding: 23px; }
+.cash-balance { padding: 24px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground); }
+.cash-balance span { color: color-mix(in srgb, var(--primary-foreground) 70%, transparent); font-size: 12px; }
+.cash-balance strong { display: block; margin-top: 9px; font-size: 38px; letter-spacing: -0.05em; }
+.budget-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
+.budget-mini { padding: 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--background); }
+.budget-mini span { display: block; color: var(--muted-foreground); font-size: 11px; }
+.budget-mini strong { display: block; margin-top: 6px; font-size: 16px; }
+
+@media (max-width: 900px) { .budget-layout { grid-template-columns: 1fr; } }

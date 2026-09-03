@@ -1,0 +1,14 @@
+.portfolio-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.62fr); gap: 16px; }
+.portfolio-form-card, .portfolio-result-card { padding: 23px; }
+.trade-direction { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.direction-button { display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border: 1px solid var(--border); border-radius: 7px; background: var(--background); color: var(--muted-foreground); font-size: 13px; }
+.direction-button-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.trade-result { display: grid; gap: 13px; }
+.trade-result-main { padding: 17px; border-radius: 10px; background: var(--primary); color: var(--primary-foreground); }
+.trade-result-main span { color: color-mix(in srgb, var(--primary-foreground) 70%, transparent); font-size: 11px; }
+.trade-result-main strong { display: block; margin-top: 7px; font-size: 30px; letter-spacing: -0.04em; }
+.result-list { display: grid; gap: 10px; }
+.result-list .data-line { padding-bottom: 10px; }
+.text-link { border: 0; background: transparent; color: var(--accent-strong); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 900px) { .portfolio-layout { grid-template-columns: 1fr; } }

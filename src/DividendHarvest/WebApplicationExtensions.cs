@@ -17,6 +17,8 @@ public static class WebApplicationExtensions
         app.UseDividendHarvestDiagnosticContext();
         app.UseExceptionHandler();
         app.UseSerilogRequestLogging();
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
         app.UseSwagger();
         app.UseSwaggerUI(options =>
         {
@@ -30,6 +32,7 @@ public static class WebApplicationExtensions
             options.RoutePrefix = "swagger";
         });
         app.MapControllers();
+        app.MapFallbackToFile("index.html");
         app.MapHealthChecks("/healthz", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("live")

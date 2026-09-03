@@ -1,4 +1,4 @@
-# Dividend Harvest 后端架构设计
+# Dividend Harvest 应用架构设计
 
 ## 1. 目标与边界
 
@@ -44,7 +44,7 @@ ASP.NET Core 默认环境名为 `Production`（大小写不敏感）时，会自
 
 Application 项目通过 `EmbeddedResource` 将根目录 `locales/**/*.json` 编译嵌入 `DividendHarvest.Application.dll`。运行时只从程序集资源读取文本，不读取可被容器或请求任意替换的本地文件。Host 的统一异常处理器根据请求的 `Accept-Language` 及其 `q` 权重选择语言，返回 canonical culture name；不支持、质量为 0 或缺失时回退到 `zh-CN`，并在 ProblemDetails 扩展中返回实际使用的 `locale`。后台同步等非 HTTP 入口使用默认语言。
 
-根目录 JSON 是前端未来复用的共享源；前端不直接读取 Application DLL，而应通过构建时复制/导入同一组资源保持显示文本一致。
+根目录 JSON 是跨层共享的文本源；前端不直接读取 Application DLL，前端构建可按需复制/导入同一组资源保持显示文本一致。当前生产前端通过 API 消费后端返回的 `error_code`、`locale` 和安全的 `detail`，不包含 FTShare key 或后端凭据。
 
 ## 4. Repo 分层布局
 
@@ -138,7 +138,7 @@ src/
 │   ├── Exceptions/                     # Infrastructure Adapter 异常
 │   │   └── FtShareProviderException.cs
 │   └── FtShare/                        # FTShare MCP Adapter 实现
-└── DividendHarvest/                    # ASP.NET Core Controllers Host
+├── DividendHarvest/                    # ASP.NET Core Controllers Host
     ├── appsettings.json                # 本地默认配置
     ├── appsettings.Production.json     # 生产环境配置
     ├── Controllers/                    # 业务 HTTP Controller
@@ -160,10 +160,17 @@ src/
     │   └── ProblemDetailsErrorRenderer.cs
     ├── HostServiceCollectionExtensions.cs
     ├── WebApplicationExtensions.cs
-    └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
+    ├── HealthChecks/                   # 原生 ASP.NET Core Health Checks
+    └── wwwroot/                        # 前端构建产物（由 DividendHarvest.Web 构建写入）
+└── DividendHarvest.Web/                # Vite + React + shadcn/ui 前端源码
+│   ├── src/features/                   # 每个 feature 自有页面、组件、API、CSS
+│   ├── src/components/ui/              # shadcn/ui 源码组件
+│   └── src/lib/                        # Axios client、DTO 类型和共享展示工具
 ```
 
-Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 HTTP 契约：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和结果类型；三类事实的共同摄取、Security 解析、FTShare 调用、幂等写入和逐类失败策略由 `IStockFactSyncAppService` / `StockFactSyncAppService` 这个深模块承载，三个 HTTP AppService 只是验证后转发。单股分析、组合分配和建议快照也保持独立的用例边界。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。
+Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 HTTP 契约：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和结果类型；三类事实的共同摄取、Security 解析、FTShare 调用、幂等写入和逐类失败策略由 `IStockFactSyncAppService` / `StockFactSyncAppService` 这个深模块承载，三个 HTTP AppService 只是验证后转发。单股分析、组合分配和建议快照也保持独立的用例边界。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。前端按相同的业务边界拆分 feature，但只通过版本化 HTTP API 访问后端，不直接引用 Application 或 Infrastructure。
+
+前端使用 Node `24.16.0` 与 pnpm `11.19.0` 构建静态资源，输出到 Host 的 `wwwroot/`；该目录是构建产物并保持本地生成，不提交源代码仓库。根目录 `Dockerfile` 使用 Node Alpine、.NET SDK Alpine 和 ASP.NET Core Alpine 三阶段构建：前两阶段只负责编译，最终镜像只保留 .NET publish 输出，因此不会携带 Node、pnpm、源码或测试依赖。单镜像构建流程必须先完成前端构建，再执行 ASP.NET Core publish；开发预览使用 Vite proxy 将 `/api` 转发到本地 Host。
 
 `Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；交易日同步通过 `IStockFactSyncAppService.SyncAsync` 一次传递单只股票的规范化引用，并消费包含三类结果和逐类失败的 `StockFactSyncResult`。如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
 
@@ -483,7 +490,7 @@ Application 使用 Riok.Mapperly 生成编译期映射代码，统一的映射�
 
 - 使用 `Asp.Versioning.Mvc` 和 `Asp.Versioning.Mvc.ApiExplorer` 为 Controller API 提供版本元数据与 OpenAPI 分组。
 - 当前业务 API 为 v1，Controller 使用 `[ApiVersion(1.0)]`，路由使用 `api/v{version:apiVersion}/...`；调用方必须显式携带 `/api/v1/...`。
-- 本仓库当前仍处于前端正式接入前的私人工具原型阶段；本次统一语义和字段命名属于 v1 合约冻结前的明确修正，已同步到 OpenAPI 说明和架构文档，不是对已发布 v1 合约的静默变更。从本次修正之后，面向外部调用方的破坏性修改必须进入 v2。
+- 当前前端已接入 v1 Controller API；前端构建产物写入 Host 的 `wwwroot`，由同一个 ASP.NET Core Host 通过 `UseDefaultFiles`、`UseStaticFiles` 和 `MapFallbackToFile("index.html")` 提供。此次接入属于 v1 合约冻结前的实现，不是对已发布 v1 合约的静默变更；之后面向调用方的破坏性修改必须进入 v2。
 - Host 使用 `UrlSegmentApiVersionReader`，不假设缺失版本时自动使用默认版本，并通过 `ReportApiVersions` 返回支持/弃用版本信息。
 - 健康检查、Swagger UI 和 Swagger JSON 使用自身的基础路径，不强行套用业务 API 版本。
 - 新增破坏性合约时增加 v2 版本元数据和对应文档分组；v1 只在明确的弃用策略下变更，不能静默改变响应语义。

@@ -1,0 +1,9 @@
+.settings-card { max-width: 1120px; padding: 24px; }
+.settings-stock-tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 22px; padding-bottom: 5px; }
+.settings-stock-tab { flex: 0 0 auto; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--muted-foreground); font-size: 12px; }
+.settings-stock-tab-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.settings-group { padding-top: 19px; border-top: 1px solid var(--border); }
+.settings-group h3 { margin: 0 0 14px; font-family: var(--font-heading); font-size: 19px; font-weight: 500; }
+.settings-group + .settings-group { margin-top: 25px; }
+
+@media (max-width: 700px) { .settings-card { padding: 18px; } }
