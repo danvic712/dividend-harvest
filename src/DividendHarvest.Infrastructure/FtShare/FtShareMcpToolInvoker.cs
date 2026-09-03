@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.ExceptionServices;
 using DividendHarvest.Infrastructure.Contracts;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
@@ -26,16 +27,56 @@ public sealed class FtShareMcpToolInvoker(
                 "FTShare MCP 地址未配置，或不是有效的 HTTP(S) 地址。请设置 FtShare__McpEndpoint。");
         }
 
+        Exception? lastTransientException = null;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await InvokeOnceAsync(
+                    endpoint,
+                    currentOptions,
+                    toolName,
+                    arguments,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastTransientException = new TimeoutException(
+                    "FTShare MCP 工具调用超时。");
+            }
+            catch (Exception exception) when (IsTransient(exception))
+            {
+                lastTransientException = exception;
+            }
+
+            if (attempt >= Math.Max(currentOptions.MaxRetryCount, 0))
+            {
+                ExceptionDispatchInfo.Capture(lastTransientException!).Throw();
+            }
+
+            await Task.Delay(
+                CalculateRetryDelay(currentOptions.RetryDelay, attempt),
+                cancellationToken);
+        }
+    }
+
+    private static async Task<JsonElement?> InvokeOnceAsync(
+        Uri endpoint,
+        FtShareOptions options,
+        string toolName,
+        IReadOnlyDictionary<string, object?> arguments,
+        CancellationToken cancellationToken)
+    {
         var transport = new HttpClientTransport(
             new HttpClientTransportOptions
             {
                 Endpoint = endpoint,
                 TransportMode = HttpTransportMode.StreamableHttp,
-                ConnectionTimeout = currentOptions.RequestTimeout
+                ConnectionTimeout = options.RequestTimeout
             });
 
         using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCancellation.CancelAfter(currentOptions.RequestTimeout);
+        timeoutCancellation.CancelAfter(options.RequestTimeout);
 
         await using var client = await McpClient.CreateAsync(
             transport,
@@ -78,5 +119,14 @@ public sealed class FtShareMcpToolInvoker(
         }
 
         return null;
+    }
+
+    private static bool IsTransient(Exception exception)
+        => exception is HttpRequestException or IOException or TimeoutException;
+
+    private static TimeSpan CalculateRetryDelay(TimeSpan baseDelay, int attempt)
+    {
+        var multiplier = Math.Min(attempt + 1, 4);
+        return TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * multiplier);
     }
 }

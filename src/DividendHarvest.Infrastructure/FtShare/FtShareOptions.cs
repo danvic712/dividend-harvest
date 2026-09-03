@@ -21,6 +21,13 @@ public sealed class FtShareOptions
 
     public int RequestTimeoutSeconds { get; set; } = 30;
 
+    public int MaxRetryCount { get; set; } = 2;
+
+    public int RetryDelayMilliseconds { get; set; } = 250;
+
     public TimeSpan RequestTimeout => TimeSpan.FromSeconds(
         Math.Clamp(RequestTimeoutSeconds, 1, 300));
+
+    public TimeSpan RetryDelay => TimeSpan.FromMilliseconds(
+        Math.Clamp(RetryDelayMilliseconds, 0, 10_000));
 }

@@ -458,9 +458,9 @@ IFtShareMcpToolInvoker
 FtShareMcpToolInvoker ──> official MCP Client ──> FTShare MCP
 ```
 
-`IFtShareMcpToolInvoker` 是 Infrastructure 内部 seam，位于 `Infrastructure/Contracts/`。`FtShareStockDataProvider` 负责 FTShare 返回值到 `StockData`、`StockMarketData`、`StockDividendData` 和 `StockFinancialData` DTO 的规范化，只接受 A 股和 CNY 股票资料，并拒绝缺少关键字段或股票身份不匹配的结果。
+`IFtShareMcpToolInvoker` 是 Infrastructure 内部 seam，位于 `Infrastructure/Contracts/`。`FtShareMcpToolInvoker` 负责 Streamable HTTP transport、单次调用超时和有限指数退避重试；只对网络、IO、超时类暂态失败重试，不重试 MCP 工具业务错误。`FtShareStockDataProvider` 负责 FTShare 返回值到 `StockData`、`StockMarketData`、`StockDividendData` 和 `StockFinancialData` DTO 的规范化，并集中构造股票代码/交易所参数；它只接受 A 股和 CNY 股票资料，并拒绝缺少关键字段或股票身份不匹配的结果。
 
-MCP 地址、工具名、股票代码参数名、交易所参数名和请求超时通过运行时配置注入。FTShare key 不进入代码、DTO、日志、镜像前端资源或 Git。
+MCP 地址、工具名、股票代码参数名、交易所参数名、请求超时、最大重试次数和重试间隔通过运行时配置注入。当前默认最多重试 2 次，使用 250ms 起步的有限退避；FTShare key 不进入代码、DTO、日志、镜像前端资源或 Git。
 
 FTShare 连接、协议、配置和超时失败先由 Adapter 转换为 Infrastructure 的 `FtShareProviderException`，该异常实现 Application Contracts 中的 `IStockDataProviderFailure` 标记接口；Application 再把它转换为 `stock_data_provider_unavailable` 或具体数据类型的业务错误。这样 Infrastructure 不直接依赖 Application 的业务异常，Application 也不依赖具体 Adapter 类型。
 

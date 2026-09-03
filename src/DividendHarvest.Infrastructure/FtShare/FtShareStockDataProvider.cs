@@ -24,21 +24,13 @@ public sealed class FtShareStockDataProvider(
         ArgumentNullException.ThrowIfNull(reference);
 
         var currentOptions = options.Value;
-        ValidateOptions(currentOptions);
-        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
-            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
-        };
-
-        var payload = await InvokeToolAsync(
-            currentOptions.StockProfileToolName,
-            arguments,
-            cancellationToken,
+        var payload = await InvokeStockToolAsync(
             reference,
+            currentOptions,
+            currentOptions.StockProfileToolName,
+            cancellationToken,
             "profile",
-            "FTShare MCP 请求超时。",
-            "FTShare MCP 股票资料暂时不可用。");
+            "FTShare MCP 请求超时。");
         return ParseStockData(reference, payload);
     }
 
@@ -49,21 +41,13 @@ public sealed class FtShareStockDataProvider(
         ArgumentNullException.ThrowIfNull(reference);
 
         var currentOptions = options.Value;
-        ValidateOptions(currentOptions);
-        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
-            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
-        };
-
-        var payload = await InvokeToolAsync(
-            currentOptions.StockMarketDataToolName,
-            arguments,
-            cancellationToken,
+        var payload = await InvokeStockToolAsync(
             reference,
+            currentOptions,
+            currentOptions.StockMarketDataToolName,
+            cancellationToken,
             "market",
-            "FTShare MCP 行情请求超时。",
-            "FTShare MCP 行情数据暂时不可用。");
+            "FTShare MCP 行情请求超时。");
         return ParseMarketData(reference, payload);
     }
 
@@ -74,21 +58,13 @@ public sealed class FtShareStockDataProvider(
         ArgumentNullException.ThrowIfNull(reference);
 
         var currentOptions = options.Value;
-        ValidateOptions(currentOptions);
-        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
-            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
-        };
-
-        var payload = await InvokeToolAsync(
-            currentOptions.StockDividendEventsToolName,
-            arguments,
-            cancellationToken,
+        var payload = await InvokeStockToolAsync(
             reference,
+            currentOptions,
+            currentOptions.StockDividendEventsToolName,
+            cancellationToken,
             "dividend",
-            "FTShare MCP 股息请求超时。",
-            "FTShare MCP 股息数据暂时不可用。");
+            "FTShare MCP 股息请求超时。");
         return ParseDividendData(reference, payload);
     }
 
@@ -99,21 +75,13 @@ public sealed class FtShareStockDataProvider(
         ArgumentNullException.ThrowIfNull(reference);
 
         var currentOptions = options.Value;
-        ValidateOptions(currentOptions);
-        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
-            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
-        };
-
-        var payload = await InvokeToolAsync(
-            currentOptions.StockFinancialSnapshotsToolName,
-            arguments,
-            cancellationToken,
+        var payload = await InvokeStockToolAsync(
             reference,
+            currentOptions,
+            currentOptions.StockFinancialSnapshotsToolName,
+            cancellationToken,
             "financial",
-            "FTShare MCP 财务请求超时。",
-            "FTShare MCP 财务数据暂时不可用。");
+            "FTShare MCP 财务请求超时。");
         return ParseFinancialData(reference, payload);
     }
 
@@ -129,6 +97,38 @@ public sealed class FtShareStockDataProvider(
             throw new FtShareProviderException(
                 new InvalidOperationException("FTShare MCP 股票资料工具配置不完整。"));
         }
+
+        if (options.RequestTimeoutSeconds is < 1 or > 300
+            || options.MaxRetryCount is < 0 or > 5
+            || options.RetryDelayMilliseconds is < 0 or > 10_000)
+        {
+            throw new FtShareProviderException(
+                new InvalidOperationException("FTShare MCP 超时、重试次数或重试间隔配置无效。"));
+        }
+    }
+
+    private async Task<JsonElement?> InvokeStockToolAsync(
+        AShareReference reference,
+        FtShareOptions currentOptions,
+        string toolName,
+        CancellationToken cancellationToken,
+        string dataKind,
+        string timeoutMessage)
+    {
+        ValidateOptions(currentOptions);
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [currentOptions.SecurityCodeArgumentName] = reference.SecurityCode,
+            [currentOptions.ExchangeCodeArgumentName] = reference.ExchangeCode
+        };
+
+        return await InvokeToolAsync(
+            toolName,
+            arguments,
+            cancellationToken,
+            reference,
+            dataKind,
+            timeoutMessage);
     }
 
     private async Task<JsonElement?> InvokeToolAsync(
@@ -137,8 +137,7 @@ public sealed class FtShareStockDataProvider(
         CancellationToken cancellationToken,
         AShareReference reference,
         string dataKind,
-        string timeoutMessage,
-        string unavailableMessage)
+        string timeoutMessage)
     {
         using var diagnosticScope = diagnosticContext.BeginScope(new DiagnosticScope(
             "ftshare_mcp",

@@ -22,6 +22,8 @@ FtShare__StockFinancialSnapshotsToolName=get_stock_financial_snapshots
 FtShare__SecurityCodeArgumentName=security_code
 FtShare__ExchangeCodeArgumentName=exchange_code
 FtShare__RequestTimeoutSeconds=30
+FtShare__MaxRetryCount=2
+FtShare__RetryDelayMilliseconds=250
 ```
 
 Adapter 使用 Streamable HTTP；股票代码和交易所参数会按项目的 `security_code`、`exchange_code` canonical 字段发送，返回资料会规范化为 A 股、CNY 数据。
