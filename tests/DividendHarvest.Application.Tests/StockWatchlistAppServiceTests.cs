@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Stocks;
@@ -70,15 +69,43 @@ public sealed class StockWatchlistAppServiceTests
         Assert.Equal(10.25m, holding!.AverageCostPerShare);
     }
 
+    [Fact]
+    public async Task GetAsync_uses_exchange_as_tie_breaker_for_same_security_code()
+    {
+        var securityRepository = CreateRepository<Security>([
+            new Security
+            {
+                Id = Guid.NewGuid(),
+                SecurityCode = "000001",
+                ExchangeCode = "SZSE",
+                SecurityName = "深交所股票",
+                MarketCode = "A-share",
+                CurrencyCode = "CNY"
+            },
+            new Security
+            {
+                Id = Guid.NewGuid(),
+                SecurityCode = "000001",
+                ExchangeCode = "SSE",
+                SecurityName = "上交所股票",
+                MarketCode = "A-share",
+                CurrencyCode = "CNY"
+            }
+        ]);
+        var positionRepository = CreateRepository<PortfolioPosition>([]);
+        var unitOfWork = new Mock<IUow>();
+        unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<PortfolioPosition>())
+            .Returns(positionRepository.Object);
+
+        var result = await new StockWatchlistAppService(unitOfWork.Object)
+            .GetAsync(CancellationToken.None);
+
+        Assert.Equal(["SSE", "SZSE"], result.Select(item => item.ExchangeCode));
+    }
+
     private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(IEnumerable<TEntity> entities)
         where TEntity : class
-    {
-        var repository = new Mock<IRepository<TEntity>>();
-        repository
-            .Setup(x => x.GetQueryable(
-                true,
-                It.IsAny<Expression<Func<TEntity, object>>[]>()))
-            .Returns(entities.AsAsyncQueryable());
-        return repository;
-    }
+        => RepositoryMock.Create(entities);
 }

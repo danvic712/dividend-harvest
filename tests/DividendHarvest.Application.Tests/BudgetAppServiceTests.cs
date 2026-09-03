@@ -5,10 +5,10 @@ using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Exceptions;
 using DividendHarvest.Domain.Models;
 using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using Moq;
-using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace DividendHarvest.Application.Tests;
@@ -205,7 +205,9 @@ public sealed class BudgetAppServiceTests
             ledgerRepository);
         unitOfWork
             .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new DbUpdateException("duplicate source record"));
+            .ThrowsAsync(new UnitOfWorkCommitException(
+                new InvalidOperationException("duplicate source record"),
+                isUniqueConstraintViolation: true));
         var service = CreateService(unitOfWork.Object);
 
         await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
@@ -217,6 +219,30 @@ public sealed class BudgetAppServiceTests
                 null,
                 null,
                 "deposit-concurrent"),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task RecordAsync_preserves_non_unique_commit_failures()
+    {
+        var unitOfWork = CreateUnitOfWork(
+            CreateRepository([CreatePortfolio()]),
+            CreateRepository<CashLedgerEntry>([]));
+        unitOfWork
+            .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UnitOfWorkCommitException(
+                new InvalidOperationException("database unavailable")));
+        var service = CreateService(unitOfWork.Object);
+
+        await Assert.ThrowsAsync<UnitOfWorkCommitException>(() => service.RecordAsync(
+            new RecordCashLedgerEntryRequest(
+                new DateOnly(2026, 9, 1),
+                "budget_deposit",
+                "inflow",
+                5000m,
+                null,
+                null,
+                "deposit-database-failure"),
             CancellationToken.None));
     }
 
@@ -257,15 +283,7 @@ public sealed class BudgetAppServiceTests
     private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(
         IEnumerable<TEntity> entities)
         where TEntity : class
-    {
-        var repository = new Mock<IRepository<TEntity>>();
-        repository
-            .Setup(x => x.GetQueryable(
-                It.IsAny<bool>(),
-                It.IsAny<Expression<Func<TEntity, object>>[]>()))
-            .Returns(entities.AsAsyncQueryable());
-        return repository;
-    }
+        => RepositoryMock.Create(entities);
 
     private static Mock<IUow> CreateUnitOfWork(
         Mock<IRepository<PortfolioEntity>> portfolioRepository,

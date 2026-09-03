@@ -8,7 +8,6 @@ using DividendHarvest.Domain.Models;
 using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.DividendStrategy;
 
@@ -43,12 +42,13 @@ public sealed class StockModelParameterAppService(
 
         var currentDate = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         var parameters = await uow.Get<ModelParameterSet>()
-            .GetQueryable(asNoTracking: true)
-            .Where(parameter =>
-                parameter.SecurityId == security.Id
-                && parameter.EffectiveFromDate <= currentDate)
-            .OrderByDescending(parameter => parameter.EffectiveFromDate)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(
+                parameter =>
+                    parameter.SecurityId == security.Id
+                    && parameter.EffectiveFromDate <= currentDate,
+                orderBy: parameter => parameter.EffectiveFromDate,
+                descending: true,
+                cancellationToken: cancellationToken);
 
         return parameters is null
             ? null
@@ -82,8 +82,7 @@ public sealed class StockModelParameterAppService(
         }
 
         var portfolio = await uow.Get<PortfolioEntity>()
-            .GetQueryable(asNoTracking: true)
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken: cancellationToken);
         if (portfolio is null)
         {
             throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
@@ -91,7 +90,6 @@ public sealed class StockModelParameterAppService(
 
         var parameterRepository = uow.Get<ModelParameterSet>();
         var versionExists = await parameterRepository
-            .GetQueryable(asNoTracking: true)
             .AnyAsync(parameter =>
                 parameter.SecurityId == security.Id
                 && parameter.EffectiveFromDate == request.EffectiveFromDate,
@@ -118,12 +116,11 @@ public sealed class StockModelParameterAppService(
         AShareReference reference,
         CancellationToken cancellationToken)
         => await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 security =>
                     security.SecurityCode == reference.SecurityCode
                     && security.ExchangeCode == reference.ExchangeCode,
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
     private static ModelParameterSet CreateParameters(
         Guid portfolioId,

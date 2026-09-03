@@ -294,15 +294,7 @@ public sealed class PortfolioRecommendationAppServiceTests
     private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(
         IEnumerable<TEntity> entities)
         where TEntity : class
-    {
-        var repository = new Mock<IRepository<TEntity>>();
-        repository
-            .Setup(x => x.GetQueryable(
-                It.IsAny<bool>(),
-                It.IsAny<Expression<Func<TEntity, object>>[]>()))
-            .Returns(entities.AsAsyncQueryable());
-        return repository;
-    }
+        => RepositoryMock.Create(entities);
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {

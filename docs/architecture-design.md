@@ -77,6 +77,7 @@ src/
 │   │   └── PortfolioTrade.cs
 │   ├── Codes/                          # 业务代码表（状态、区域和建议）
 │   ├── Enums/                           # 真正的枚举；当前暂无枚举
+│   ├── Exceptions/                     # 跨层可识别的持久化异常
 │   ├── Portfolio/                      # 持仓领域规则
 │   ├── Securities/                     # A 股标识领域规则
 │   └── DividendModel/                  # 股息率与价格区域计算
@@ -197,14 +198,39 @@ Application 的 DTO 位于 `Application/Dtos/`，用于 Controller 与用例之�
 
 本项目参考 `salary-insights` 的通用 EF Core 数据访问模式，但保留本项目的 `IUow` 命名和“所有数据访问只能通过 Uow”的约束。
 
-### 5.1 Domain Contracts
+### 6.1 Domain Contracts
 
 ```csharp
 public interface IRepository<TEntity> where TEntity : class
 {
-    IQueryable<TEntity> GetQueryable(
-        bool asNoTracking = false,
-        params Expression<Func<TEntity, object>>[] includes);
+    Task<bool> AnyAsync(CancellationToken cancellationToken = default);
+
+    Task<bool> AnyAsync(
+        Expression<Func<TEntity, bool>> predicate,
+        CancellationToken cancellationToken = default);
+
+    Task<TEntity?> FirstOrDefaultAsync(
+        Expression<Func<TEntity, bool>> predicate,
+        Expression<Func<TEntity, object>>? orderBy = null,
+        bool descending = false,
+        CancellationToken cancellationToken = default,
+        bool asNoTracking = true);
+
+    Task<TEntity?> SingleOrDefaultAsync(
+        CancellationToken cancellationToken = default,
+        bool asNoTracking = true);
+
+    Task<TEntity?> SingleOrDefaultAsync(
+        Expression<Func<TEntity, bool>> predicate,
+        CancellationToken cancellationToken = default,
+        bool asNoTracking = true);
+
+    Task<IReadOnlyList<TEntity>> ListAsync(
+        Expression<Func<TEntity, bool>>? predicate = null,
+        IReadOnlyList<Expression<Func<TEntity, object>>>? orderBy = null,
+        bool descending = false,
+        CancellationToken cancellationToken = default,
+        bool asNoTracking = true);
 
     Task AddAsync(TEntity entity, CancellationToken cancellationToken = default);
 
@@ -227,9 +253,11 @@ public interface IUow
 }
 ```
 
-`IRepository<TEntity>` 提供实体集合的最小查询和写入能力；`IUow.Get<TEntity>()` 是 Application 获取 Repository 的唯一入口。Application 不注入具体 Repository，不保留按用例命名的专用 Repository Interface。
+`IRepository<TEntity>` 提供实体集合的行为型查询和写入能力；`IUow.Get<TEntity>()` 是 Application 获取 Repository 的唯一入口。Application 只提交谓词、排序选择器列表和追踪意图，不接触 `IQueryable`、`DbSet`、`Include` 或 EF Core 异步扩展。Application 不注入具体 Repository，不保留按用例命名的专用 Repository Interface。
 
-### 5.2 Infrastructure 实现
+读操作默认使用 no-tracking；只有需要在同一 UoW 中修改已加载实体时才显式传入 `asNoTracking: false`。返回值使用已完成的集合或实体任务，不把查询 provider 延迟到 Application。
+
+### 6.2 Infrastructure 实现
 
 ```text
 SetupAppService
@@ -252,8 +280,9 @@ SetupAppService
 ```
 
 - `EFUow` 使用按实体类型缓存的 lazy Repository，与 `salary-insights` 的 `ConcurrentDictionary<Type, Lazy<object>>` 模式一致。
-- `EFRepository<TEntity>` 只包装 `DbContext.Set<TEntity>()`，负责查询、包含、添加和删除。
-- `EFUow.CommitAsync` 统一调用 `SaveChangesAsync`；一个用例的多个实体写入在一次提交中完成。
+- `EFRepository<TEntity>` 是真正的 EF adapter：在内部组合 `DbContext.Set<TEntity>()`、过滤、排序、追踪策略和 EF Core 异步执行，然后只返回 Repository 合约要求的结果。
+- `EFUow.CommitAsync` 统一调用 `SaveChangesAsync`；数据库更新失败在 Infrastructure 转换为 Domain 的 `UnitOfWorkCommitException`，并只标记可识别的 SQLite 唯一约束失败；Application 不引用 `DbUpdateException`。
+- 一个用例的多个实体写入在一次提交中完成；Repository 不提前提交，也不把可延迟执行的查询对象交给调用方。
 - `DividendHarvestDbContext` 位于 Infrastructure 根目录；`EFRepository<TEntity>` 和 `EFUow` 位于 `Infrastructure/Repositories/`，均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
 - Host 的 `/healthz`、`/readyz` 使用 ASP.NET Core 原生 Health Checks；数据库健康检查通过 `IUow.CanConnectAsync` 实现。健康检查是运行状态入口，不属于业务 API 版本范围。
 - Host 的启动建库只能通过 `IUow.EnsureCreatedAsync`，不直接解析 DbContext。

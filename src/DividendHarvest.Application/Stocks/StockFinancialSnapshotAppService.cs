@@ -7,7 +7,6 @@ using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Stocks;
 
@@ -32,7 +31,6 @@ public sealed class StockFinancialSnapshotAppService(
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
         var security = await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 item =>
                     item.SecurityCode == reference.SecurityCode
@@ -70,9 +68,9 @@ public sealed class StockFinancialSnapshotAppService(
 
         var snapshotRepository = uow.Get<FinancialSnapshot>();
         var existingSnapshots = await snapshotRepository
-            .GetQueryable(asNoTracking: true)
-            .Where(snapshot => snapshot.SecurityId == security.Id)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                snapshot => snapshot.SecurityId == security.Id,
+                cancellationToken: cancellationToken);
         var existingByDate = existingSnapshots.ToDictionary(
             snapshot => snapshot.DataAsOfDate);
         var seenDates = new HashSet<DateOnly>();

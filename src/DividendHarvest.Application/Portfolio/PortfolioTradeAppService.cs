@@ -3,12 +3,12 @@ using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Exceptions;
 using DividendHarvest.Domain.Models;
 using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Portfolio;
 
@@ -30,8 +30,7 @@ public sealed class PortfolioTradeAppService(
         }
 
         var portfolio = await uow.Get<PortfolioEntity>()
-            .GetQueryable(asNoTracking: true)
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken: cancellationToken);
         if (portfolio is null)
         {
             throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
@@ -39,7 +38,6 @@ public sealed class PortfolioTradeAppService(
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
         var security = await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 item =>
                     item.SecurityCode == reference.SecurityCode
@@ -58,18 +56,17 @@ public sealed class PortfolioTradeAppService(
         var existingTrade = string.IsNullOrWhiteSpace(sourceRecordId)
             ? null
             : await tradeRepository
-                .GetQueryable(asNoTracking: true)
                 .SingleOrDefaultAsync(
                     item => item.PortfolioId == portfolio.Id
                         && item.SourceRecordId == sourceRecordId,
                     cancellationToken);
         var positionRepository = uow.Get<PortfolioPosition>();
         var position = await positionRepository
-            .GetQueryable()
             .SingleOrDefaultAsync(
                 item => item.PortfolioId == portfolio.Id
                     && item.SecurityId == security.Id,
-                cancellationToken);
+                cancellationToken,
+                asNoTracking: false);
         if (existingTrade is not null)
         {
             if (!MatchesRequest(existingTrade, request, security.Id))
@@ -178,7 +175,9 @@ public sealed class PortfolioTradeAppService(
         {
             await uow.CommitAsync(cancellationToken);
         }
-        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(sourceRecordId))
+        catch (UnitOfWorkCommitException exception)
+            when (!string.IsNullOrWhiteSpace(sourceRecordId)
+                && exception.IsUniqueConstraintViolation)
         {
             // The filtered unique index protects against concurrent duplicate
             // submissions that both pass the read-before-insert check.

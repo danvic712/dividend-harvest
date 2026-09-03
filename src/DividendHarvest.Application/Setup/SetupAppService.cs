@@ -9,7 +9,6 @@ using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Setup;
 
@@ -21,8 +20,7 @@ public sealed class SetupAppService(
     public async Task<SetupStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
         var isComplete = await uow.Get<PortfolioEntity>()
-            .GetQueryable(asNoTracking: true)
-            .AnyAsync(cancellationToken);
+            .AnyAsync(cancellationToken: cancellationToken);
 
         return isComplete
             ? new SetupStatus(true, [])
@@ -44,8 +42,7 @@ public sealed class SetupAppService(
         }
 
         if (await uow.Get<PortfolioEntity>()
-            .GetQueryable(asNoTracking: true)
-            .AnyAsync(cancellationToken))
+            .AnyAsync(cancellationToken: cancellationToken))
         {
             throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupAlreadyCompleted);
         }

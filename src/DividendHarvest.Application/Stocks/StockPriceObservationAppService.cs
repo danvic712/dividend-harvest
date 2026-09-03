@@ -7,7 +7,6 @@ using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Stocks;
 
@@ -32,7 +31,6 @@ public sealed class StockPriceObservationAppService(
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
         var security = await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 item =>
                     item.SecurityCode == reference.SecurityCode
@@ -69,7 +67,6 @@ public sealed class StockPriceObservationAppService(
         }
 
         PriceObservation? existingObservation = await uow.Get<PriceObservation>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 observation =>
                     observation.SecurityId == security.Id

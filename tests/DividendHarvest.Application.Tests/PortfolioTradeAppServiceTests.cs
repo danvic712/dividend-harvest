@@ -5,9 +5,9 @@ using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Portfolio;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Exceptions;
 using DividendHarvest.Domain.Models;
 using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
-using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
 
@@ -284,7 +284,9 @@ public sealed class PortfolioTradeAppServiceTests
             cashRepository);
         unitOfWork
             .Setup(x => x.CommitAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new DbUpdateException("duplicate source record"));
+            .ThrowsAsync(new UnitOfWorkCommitException(
+                new InvalidOperationException("duplicate source record"),
+                isUniqueConstraintViolation: true));
         var service = CreateService(unitOfWork.Object);
 
         await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
@@ -332,15 +334,7 @@ public sealed class PortfolioTradeAppServiceTests
     private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(
         IEnumerable<TEntity> entities)
         where TEntity : class
-    {
-        var repository = new Mock<IRepository<TEntity>>();
-        repository
-            .Setup(x => x.GetQueryable(
-                It.IsAny<bool>(),
-                It.IsAny<Expression<Func<TEntity, object>>[]>()))
-            .Returns(entities.AsAsyncQueryable());
-        return repository;
-    }
+        => RepositoryMock.Create(entities);
 
     private static Mock<IUow> CreateUnitOfWork(
         Mock<IRepository<PortfolioEntity>> portfolioRepository,

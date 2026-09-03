@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Exceptions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Infrastructure.Repositories;
@@ -23,7 +25,7 @@ internal sealed class EFUow(DividendHarvestDbContext dbContext) : IUow
     }
 
     public Task<int> CommitAsync(CancellationToken cancellationToken = default)
-        => dbContext.SaveChangesAsync(cancellationToken);
+        => CommitChangesAsync(cancellationToken);
 
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken = default)
         => dbContext.Database.CanConnectAsync(cancellationToken);
@@ -98,6 +100,26 @@ internal sealed class EFUow(DividendHarvestDbContext dbContext) : IUow
             $"ALTER TABLE \"{tableName}\" ADD COLUMN \"{columnName}\" {columnDefinition}";
         await alterCommand.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private async Task<int> CommitChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+        {
+            throw new UnitOfWorkCommitException(
+                exception,
+                IsUniqueConstraintViolation(exception));
+        }
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
+        => exception.GetBaseException() is SqliteException
+        {
+            SqliteExtendedErrorCode: 2067
+        };
 
     private static async Task EnsureUniqueCashLedgerSourceIndexAsync(
         DbConnection connection,

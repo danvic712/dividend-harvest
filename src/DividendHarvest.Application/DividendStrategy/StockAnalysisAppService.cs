@@ -9,7 +9,6 @@ using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.DividendStrategy;
 
@@ -33,7 +32,6 @@ public sealed class StockAnalysisAppService(
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
         var security = await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 item =>
                     item.SecurityCode == reference.SecurityCode
@@ -49,36 +47,37 @@ public sealed class StockAnalysisAppService(
 
         var currentDate = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         var parameters = await uow.Get<ModelParameterSet>()
-            .GetQueryable(asNoTracking: true)
-            .Where(parameter =>
-                parameter.SecurityId == security.Id
-                && parameter.EffectiveFromDate <= currentDate)
-            .OrderByDescending(parameter => parameter.EffectiveFromDate)
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(
+                parameter =>
+                    parameter.SecurityId == security.Id
+                    && parameter.EffectiveFromDate <= currentDate,
+                orderBy: parameter => parameter.EffectiveFromDate,
+                descending: true,
+                cancellationToken: cancellationToken);
         var priceObservations = await uow.Get<PriceObservation>()
-            .GetQueryable(asNoTracking: true)
-            .Where(observation =>
-                observation.SecurityId == security.Id
-                && observation.TradingDate <= currentDate
-                && observation.DataQualityCode == DataQualityCodes.Valid)
-            .OrderByDescending(observation => observation.TradingDate)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                observation =>
+                    observation.SecurityId == security.Id
+                    && observation.TradingDate <= currentDate
+                    && observation.DataQualityCode == DataQualityCodes.Valid,
+                orderBy: [observation => observation.TradingDate],
+                descending: true,
+                cancellationToken: cancellationToken);
         var priceObservation = priceObservations.FirstOrDefault();
         var dividendEvents = await uow.Get<DividendEvent>()
-            .GetQueryable(asNoTracking: true)
-            .Where(dividendEvent => dividendEvent.SecurityId == security.Id)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                dividendEvent => dividendEvent.SecurityId == security.Id,
+                cancellationToken: cancellationToken);
         var financialSnapshots = await uow.Get<FinancialSnapshot>()
-            .GetQueryable(asNoTracking: true)
-            .Where(snapshot => snapshot.SecurityId == security.Id)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                snapshot => snapshot.SecurityId == security.Id,
+                cancellationToken: cancellationToken);
         var position = await uow.Get<PortfolioPosition>()
-            .GetQueryable(asNoTracking: true)
             .FirstOrDefaultAsync(
                 currentPosition => currentPosition.SecurityId == security.Id
                     && (parameters == null
                         || currentPosition.PortfolioId == parameters.PortfolioId),
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
         var heldShares = position?.HeldShares ?? 0;
         var coreShares = position?.CoreShares ?? 0;
@@ -117,20 +116,20 @@ public sealed class StockAnalysisAppService(
             priceObservation.TradingDate);
 
         var cashEntries = await uow.Get<CashLedgerEntry>()
-            .GetQueryable(asNoTracking: true)
-            .Where(entry => entry.PortfolioId == parameters.PortfolioId)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                entry => entry.PortfolioId == parameters.PortfolioId,
+                cancellationToken: cancellationToken);
         var cashBalanceAmount = PortfolioBudgetCalculator.CalculateCashBalance(cashEntries);
         var portfolioPositions = await uow.Get<PortfolioPosition>()
-            .GetQueryable(asNoTracking: true)
-            .Where(currentPosition => currentPosition.PortfolioId == parameters.PortfolioId)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                currentPosition => currentPosition.PortfolioId == parameters.PortfolioId,
+                cancellationToken: cancellationToken);
         var portfolioPriceObservations = await uow.Get<PriceObservation>()
-            .GetQueryable(asNoTracking: true)
-            .Where(observation =>
-                observation.TradingDate <= currentDate
-                && observation.DataQualityCode == DataQualityCodes.Valid)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                observation =>
+                    observation.TradingDate <= currentDate
+                    && observation.DataQualityCode == DataQualityCodes.Valid,
+                cancellationToken: cancellationToken);
         var latestPrices = portfolioPriceObservations
             .GroupBy(observation => observation.SecurityId)
             .ToDictionary(
@@ -147,11 +146,11 @@ public sealed class StockAnalysisAppService(
             portfolioPositions,
             latestPrices.Keys.ToHashSet());
         var portfolioParameters = await uow.Get<ModelParameterSet>()
-            .GetQueryable(asNoTracking: true)
-            .Where(parameter =>
-                parameter.PortfolioId == parameters.PortfolioId
-                && parameter.EffectiveFromDate <= currentDate)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                parameter =>
+                    parameter.PortfolioId == parameters.PortfolioId
+                    && parameter.EffectiveFromDate <= currentDate,
+                cancellationToken: cancellationToken);
         var cashReserveRatio = PortfolioBudgetCalculator.CalculateCurrentCashReserveRatio(
             portfolioParameters,
             currentDate);

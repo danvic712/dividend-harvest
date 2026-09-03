@@ -7,7 +7,6 @@ using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Stocks;
 
@@ -32,7 +31,6 @@ public sealed class StockDividendEventAppService(
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
         var security = await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
             .SingleOrDefaultAsync(
                 item =>
                     item.SecurityCode == reference.SecurityCode
@@ -70,9 +68,9 @@ public sealed class StockDividendEventAppService(
 
         var eventRepository = uow.Get<DividendEvent>();
         var existingEvents = await eventRepository
-            .GetQueryable(asNoTracking: true)
-            .Where(dividendEvent => dividendEvent.SecurityId == security.Id)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                dividendEvent => dividendEvent.SecurityId == security.Id,
+                cancellationToken: cancellationToken);
         var existingBySourceRecordId = existingEvents.ToDictionary(
             dividendEvent => dividendEvent.SourceRecordId,
             StringComparer.Ordinal);

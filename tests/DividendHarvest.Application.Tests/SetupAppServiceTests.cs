@@ -188,23 +188,14 @@ public sealed class SetupAppServiceTests
         => new(new SetupStockRequestValidator(new InitialHoldingInputValidator()));
 
     private static Mock<IRepository<PortfolioEntity>> CreatePortfolioRepository(bool hasPortfolio)
-    {
-        var repository = new Mock<IRepository<PortfolioEntity>>();
-        repository
-            .Setup(x => x.GetQueryable(
-                It.IsAny<bool>(),
-                It.IsAny<Expression<Func<PortfolioEntity, object>>[]>()))
-            .Returns(new[]
+        => RepositoryMock.Create(new[]
             {
                 hasPortfolio
                     ? new PortfolioEntity { Id = Guid.NewGuid(), Name = "长期股息组合" }
                     : null
             }
             .Where(entity => entity is not null)
-            .Cast<PortfolioEntity>()
-            .AsAsyncQueryable());
-        return repository;
-    }
+            .Cast<PortfolioEntity>());
 
     private static Mock<IUow> CreateUnitOfWork(
         Mock<IRepository<PortfolioEntity>> portfolioRepository,

@@ -3,7 +3,6 @@ using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.DividendStrategy;
 
@@ -18,8 +17,7 @@ public sealed class RecommendationSnapshotAppService(
         var recommendation = await portfolioRecommendationAppService.GetAsync(
             cancellationToken);
         var stocks = await uow.Get<Security>()
-            .GetQueryable(asNoTracking: true)
-            .ToListAsync(cancellationToken);
+            .ListAsync(cancellationToken: cancellationToken);
         var securitiesByReference = stocks.ToDictionary(
             security => (security.SecurityCode, security.ExchangeCode));
         var modelRunId = Guid.NewGuid();

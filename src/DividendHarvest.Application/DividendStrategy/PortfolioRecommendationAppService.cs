@@ -5,7 +5,6 @@ using DividendHarvest.Domain.DividendModel;
 using DividendHarvest.Domain.Codes;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.DividendStrategy;
 
@@ -31,11 +30,11 @@ public sealed class PortfolioRecommendationAppService(
         var budgetSummary = await budgetAppService.GetSummaryAsync(cancellationToken);
         var currentDate = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         var parameters = await uow.Get<ModelParameterSet>()
-            .GetQueryable(asNoTracking: true)
-            .Where(parameter =>
-                parameter.PortfolioId == budgetSummary.PortfolioId
-                && parameter.EffectiveFromDate <= currentDate)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                parameter =>
+                    parameter.PortfolioId == budgetSummary.PortfolioId
+                    && parameter.EffectiveFromDate <= currentDate,
+                cancellationToken: cancellationToken);
         var parametersById = parameters.ToDictionary(parameter => parameter.Id);
         var totalPortfolioValue = analyses
             .Where(analysis => analysis.ClosePrice is not null)

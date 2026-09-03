@@ -4,12 +4,12 @@ using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Domain.Exceptions;
 using DividendHarvest.Domain.Models;
 using PortfolioEntity = DividendHarvest.Domain.Models.Portfolio;
 using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 namespace DividendHarvest.Application.Portfolio;
 
@@ -32,8 +32,7 @@ public sealed class BudgetAppService(
         }
 
         var portfolio = await uow.Get<PortfolioEntity>()
-            .GetQueryable(asNoTracking: true)
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken: cancellationToken);
         if (portfolio is null)
         {
             throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
@@ -45,7 +44,6 @@ public sealed class BudgetAppService(
         var security = reference is null
             ? null
             : await uow.Get<Security>()
-                .GetQueryable(asNoTracking: true)
                 .SingleOrDefaultAsync(
                     item =>
                         item.SecurityCode == reference.SecurityCode
@@ -64,7 +62,6 @@ public sealed class BudgetAppService(
         if (!string.IsNullOrWhiteSpace(sourceRecordId))
         {
             var existingEntry = await ledgerRepository
-                .GetQueryable(asNoTracking: true)
                 .SingleOrDefaultAsync(
                     entry => entry.PortfolioId == portfolio.Id
                         && entry.SourceRecordId == sourceRecordId,
@@ -109,7 +106,9 @@ public sealed class BudgetAppService(
         {
             await uow.CommitAsync(cancellationToken);
         }
-        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(sourceRecordId))
+        catch (UnitOfWorkCommitException exception)
+            when (!string.IsNullOrWhiteSpace(sourceRecordId)
+                && exception.IsUniqueConstraintViolation)
         {
             // The filtered unique index protects against two concurrent retries
             // that both pass the read-before-insert idempotency check.
@@ -128,17 +127,16 @@ public sealed class BudgetAppService(
         CancellationToken cancellationToken)
     {
         var portfolio = await uow.Get<PortfolioEntity>()
-            .GetQueryable(asNoTracking: true)
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken: cancellationToken);
         if (portfolio is null)
         {
             throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
         }
 
         var entries = await uow.Get<CashLedgerEntry>()
-            .GetQueryable(asNoTracking: true)
-            .Where(entry => entry.PortfolioId == portfolio.Id)
-            .ToListAsync(cancellationToken);
+            .ListAsync(
+                entry => entry.PortfolioId == portfolio.Id,
+                cancellationToken: cancellationToken);
         var totalInflow = entries
             .Where(entry => entry.CashDirectionCode == "inflow")
             .Sum(entry => entry.CashAmount);
