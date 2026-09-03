@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Application.Localization;
 using DividendHarvest.Application.Stocks;
 using DividendHarvest.Application.Validators;
 using DividendHarvest.Domain.Contracts;
@@ -150,8 +151,10 @@ public sealed class StockPriceObservationAppServiceTests
         IUow unitOfWork,
         IStockDataProvider provider)
         => new(
-            unitOfWork,
-            provider,
+            new StockFactSyncAppService(
+                unitOfWork,
+                provider,
+                new ApplicationErrorCatalog()),
             new SyncStockPriceRequestValidator());
 
     private static Security CreateSecurity()

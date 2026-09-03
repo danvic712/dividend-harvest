@@ -1,18 +1,14 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
-using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
-using DividendHarvest.Domain.Contracts;
-using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
 
 namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockFinancialSnapshotAppService(
-    IUow uow,
-    IStockDataProvider stockDataProvider,
+    IStockFactSyncAppService stockFactSyncAppService,
     IValidator<SyncStockFinancialsRequest> requestValidator)
     : IStockFinancialSnapshotAppService
 {
@@ -30,141 +26,8 @@ public sealed class StockFinancialSnapshotAppService(
         }
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
-        var security = await uow.Get<Security>()
-            .SingleOrDefaultAsync(
-                item =>
-                    item.SecurityCode == reference.SecurityCode
-                    && item.ExchangeCode == reference.ExchangeCode,
-                cancellationToken);
-        if (security is null)
-        {
-            throw ApplicationErrors.WithSecurityReference(
-                ApplicationErrorCodes.StockNotConfigured,
-                reference.SecurityCode,
-                reference.ExchangeCode);
-        }
-
-        IReadOnlyList<StockFinancialData>? financialData;
-        try
-        {
-            financialData = await stockDataProvider.GetFinancialSnapshotsAsync(
-                reference,
-                cancellationToken);
-        }
-        catch (Exception exception) when (exception is IStockDataProviderFailure)
-        {
-            throw ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockFinancialDataUnavailable,
-                reference.SecurityCode,
-                exception);
-        }
-
-        if (financialData is null)
-        {
-            throw ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockFinancialDataUnavailable,
-                reference.SecurityCode);
-        }
-
-        var snapshotRepository = uow.Get<FinancialSnapshot>();
-        var existingSnapshots = await snapshotRepository
-            .ListAsync(
-                snapshot => snapshot.SecurityId == security.Id,
-                cancellationToken: cancellationToken);
-        var existingByDate = existingSnapshots.ToDictionary(
-            snapshot => snapshot.DataAsOfDate);
-        var seenDates = new HashSet<DateOnly>();
-        var newSnapshots = new List<FinancialSnapshot>();
-        var results = new List<StockFinancialSnapshotResult>(financialData.Count);
-
-        foreach (var data in financialData)
-        {
-            if (data is null || !MatchesReference(reference, data))
-            {
-                throw ApplicationErrors.WithSecurity(
-                    ApplicationErrorCodes.StockFinancialDataUnavailable,
-                    reference.SecurityCode);
-            }
-
-            if (!seenDates.Add(data.DataAsOfDate))
-            {
-                throw ApplicationErrors.WithSecurity(
-                    ApplicationErrorCodes.StockFinancialDataUnavailable,
-                    reference.SecurityCode);
-            }
-
-            if (existingByDate.TryGetValue(data.DataAsOfDate, out var existingSnapshot))
-            {
-                results.Add(ApplicationMapper.ToStockFinancialSnapshotResult(
-                    existingSnapshot,
-                    reference.SecurityCode,
-                    reference.ExchangeCode));
-                continue;
-            }
-
-            var snapshot = CreateSnapshot(security.Id, data);
-            newSnapshots.Add(snapshot);
-            results.Add(ApplicationMapper.ToStockFinancialSnapshotResult(
-                snapshot,
-                reference.SecurityCode,
-                reference.ExchangeCode));
-            existingByDate.Add(data.DataAsOfDate, snapshot);
-        }
-
-        foreach (var snapshot in newSnapshots)
-        {
-            await snapshotRepository.AddAsync(snapshot, cancellationToken);
-        }
-
-        if (newSnapshots.Count > 0)
-        {
-            await uow.CommitAsync(cancellationToken);
-        }
-
-        return results;
+        return await stockFactSyncAppService.SyncFinancialsAsync(
+            reference,
+            cancellationToken);
     }
-
-    private static bool MatchesReference(
-        AShareReference reference,
-        StockFinancialData data)
-    {
-        try
-        {
-            return AShareReference.Create(data.SecurityCode, data.ExchangeCode) == reference;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    private static FinancialSnapshot CreateSnapshot(
-        Guid securityId,
-        StockFinancialData data)
-    {
-        try
-        {
-            return FinancialSnapshot.Create(
-                securityId,
-                data.DataAsOfDate,
-                data.CapturedAt,
-                data.PublishedAt,
-                data.EarningsPerShare,
-                data.DividendPayoutRatio,
-                data.ThreeYearAverageDividendPayoutRatio,
-                data.PriceToBookRatio,
-                data.ReturnOnEquity,
-                data.DataSource,
-                data.SourceRecordId,
-                data.DataQualityCode);
-        }
-        catch (ArgumentException exception)
-        {
-            throw ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockFinancialDataUnavailable,
-                data.SecurityCode,
-                exception);
-        }
-    }
-
 }

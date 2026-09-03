@@ -1,18 +1,14 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
-using DividendHarvest.Application.Mapping;
 using DividendHarvest.Application.Validators;
-using DividendHarvest.Domain.Contracts;
-using DividendHarvest.Domain.Models;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
 
 namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockPriceObservationAppService(
-    IUow uow,
-    IStockDataProvider stockDataProvider,
+    IStockFactSyncAppService stockFactSyncAppService,
     IValidator<SyncStockPriceRequest> requestValidator)
     : IStockPriceObservationAppService
 {
@@ -30,104 +26,8 @@ public sealed class StockPriceObservationAppService(
         }
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
-        var security = await uow.Get<Security>()
-            .SingleOrDefaultAsync(
-                item =>
-                    item.SecurityCode == reference.SecurityCode
-                    && item.ExchangeCode == reference.ExchangeCode,
-                cancellationToken);
-        if (security is null)
-        {
-            throw ApplicationErrors.WithSecurityReference(
-                ApplicationErrorCodes.StockNotConfigured,
-                reference.SecurityCode,
-                reference.ExchangeCode);
-        }
-
-        StockMarketData? marketData;
-        try
-        {
-            marketData = await stockDataProvider.GetMarketDataAsync(
-                reference,
-                cancellationToken);
-        }
-        catch (Exception exception) when (exception is IStockDataProviderFailure)
-        {
-            throw ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockMarketDataUnavailable,
-                reference.SecurityCode,
-                exception);
-        }
-
-        if (marketData is null || !MatchesReference(reference, marketData))
-        {
-            throw ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockMarketDataUnavailable,
-                reference.SecurityCode);
-        }
-
-        PriceObservation? existingObservation = await uow.Get<PriceObservation>()
-            .SingleOrDefaultAsync(
-                observation =>
-                    observation.SecurityId == security.Id
-                    && observation.TradingDate == marketData.TradingDate,
-                cancellationToken);
-        if (existingObservation is not null)
-        {
-            return ApplicationMapper.ToStockPriceObservationResult(
-                existingObservation,
-                reference.SecurityCode,
-                reference.ExchangeCode);
-        }
-
-        var observation = CreateObservation(security.Id, marketData);
-        await uow.Get<PriceObservation>().AddAsync(observation, cancellationToken);
-        await uow.CommitAsync(cancellationToken);
-
-        return ApplicationMapper.ToStockPriceObservationResult(
-            observation,
-            reference.SecurityCode,
-            reference.ExchangeCode);
+        return await stockFactSyncAppService.SyncPriceAsync(
+            reference,
+            cancellationToken);
     }
-
-    private static bool MatchesReference(
-        AShareReference reference,
-        StockMarketData marketData)
-    {
-        try
-        {
-            return AShareReference.Create(
-                marketData.SecurityCode,
-                marketData.ExchangeCode) == reference;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    private static PriceObservation CreateObservation(
-        Guid securityId,
-        StockMarketData marketData)
-    {
-        try
-        {
-            return PriceObservation.Create(
-                securityId,
-                marketData.TradingDate,
-                marketData.ClosePrice,
-                marketData.PriceObservedAt,
-                marketData.DataSource,
-                marketData.SourceRecordId,
-                marketData.DataQualityCode);
-        }
-        catch (ArgumentException exception)
-        {
-            throw ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockMarketDataUnavailable,
-                marketData.SecurityCode,
-                exception);
-        }
-    }
-
 }

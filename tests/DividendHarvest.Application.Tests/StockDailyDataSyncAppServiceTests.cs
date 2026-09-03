@@ -3,6 +3,7 @@ using DividendHarvest.Application.Stocks;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Localization;
+using DividendHarvest.Domain.Securities;
 using Moq;
 using Xunit;
 
@@ -66,29 +67,16 @@ public sealed class StockDailyDataSyncAppServiceTests
         watchlist
             .Setup(x => x.GetAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(stocks);
-        var prices = new Mock<IStockPriceObservationAppService>();
-        prices
+        var factSync = new Mock<IStockFactSyncAppService>();
+        factSync
             .Setup(x => x.SyncAsync(
-                It.IsAny<SyncStockPriceRequest>(),
+                It.IsAny<AShareReference>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StockPriceObservationResult)null!);
-        var dividends = new Mock<IStockDividendEventAppService>();
-        dividends
-            .Setup(x => x.SyncAsync(
-                It.IsAny<SyncStockDividendsRequest>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<StockDividendEventResult>());
-        var financials = new Mock<IStockFinancialSnapshotAppService>();
-        financials
-            .Setup(x => x.SyncAsync(
-                It.IsAny<SyncStockFinancialsRequest>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<StockFinancialSnapshotResult>());
+            .ReturnsAsync((AShareReference reference, CancellationToken _) =>
+                CreateSuccessfulFactResult(reference));
         var service = CreateService(
             watchlist.Object,
-            prices.Object,
-            dividends.Object,
-            financials.Object);
+            factSync.Object);
 
         var result = await service.SyncAsync(CancellationToken.None);
 
@@ -96,14 +84,8 @@ public sealed class StockDailyDataSyncAppServiceTests
         Assert.Equal(2, result.FullyCompletedStockCount);
         Assert.Equal(0, result.PartiallyFailedStockCount);
         Assert.Empty(result.Failures);
-        prices.Verify(x => x.SyncAsync(
-            It.IsAny<SyncStockPriceRequest>(),
-            It.IsAny<CancellationToken>()), Times.Exactly(2));
-        dividends.Verify(x => x.SyncAsync(
-            It.IsAny<SyncStockDividendsRequest>(),
-            It.IsAny<CancellationToken>()), Times.Exactly(2));
-        financials.Verify(x => x.SyncAsync(
-            It.IsAny<SyncStockFinancialsRequest>(),
+        factSync.Verify(x => x.SyncAsync(
+            It.IsAny<AShareReference>(),
             It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
@@ -115,31 +97,27 @@ public sealed class StockDailyDataSyncAppServiceTests
         watchlist
             .Setup(x => x.GetAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([stock]);
-        var prices = new Mock<IStockPriceObservationAppService>();
-        prices
+        var factSync = new Mock<IStockFactSyncAppService>();
+        factSync
             .Setup(x => x.SyncAsync(
-                It.IsAny<SyncStockPriceRequest>(),
+                It.IsAny<AShareReference>(),
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(ApplicationErrors.WithSecurity(
-                ApplicationErrorCodes.StockMarketDataUnavailable,
-                "000001"));
-        var dividends = new Mock<IStockDividendEventAppService>();
-        dividends
-            .Setup(x => x.SyncAsync(
-                It.IsAny<SyncStockDividendsRequest>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<StockDividendEventResult>());
-        var financials = new Mock<IStockFinancialSnapshotAppService>();
-        financials
-            .Setup(x => x.SyncAsync(
-                It.IsAny<SyncStockFinancialsRequest>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<StockFinancialSnapshotResult>());
+            .ReturnsAsync((AShareReference reference, CancellationToken _) =>
+                new StockFactSyncResult(
+                    reference.SecurityCode,
+                    reference.ExchangeCode,
+                    null,
+                    [],
+                    [],
+                    [new StockDataSyncFailure(
+                        reference.SecurityCode,
+                        reference.ExchangeCode,
+                        "price",
+                        ApplicationErrorCodes.StockMarketDataUnavailable,
+                        "行情数据暂不可用。" )]));
         var service = CreateService(
             watchlist.Object,
-            prices.Object,
-            dividends.Object,
-            financials.Object);
+            factSync.Object);
 
         var result = await service.SyncAsync(CancellationToken.None);
 
@@ -150,27 +128,29 @@ public sealed class StockDailyDataSyncAppServiceTests
         Assert.Equal("price", failure.DataKind);
         Assert.Equal("stock_market_data_unavailable", failure.ErrorCode);
         Assert.Contains("行情数据", failure.FailureMessage);
-        dividends.Verify(x => x.SyncAsync(
-            It.IsAny<SyncStockDividendsRequest>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-        financials.Verify(x => x.SyncAsync(
-            It.IsAny<SyncStockFinancialsRequest>(),
+        factSync.Verify(x => x.SyncAsync(
+            It.IsAny<AShareReference>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static StockDailyDataSyncAppService CreateService(
         IStockWatchlistAppService watchlist,
-        IStockPriceObservationAppService prices,
-        IStockDividendEventAppService dividends,
-        IStockFinancialSnapshotAppService financials)
+        IStockFactSyncAppService factSync)
         => new(
             watchlist,
-            prices,
-            dividends,
-            financials,
-            new ApplicationErrorCatalog(),
+            factSync,
             new FixedTimeProvider(
                 new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero)));
+
+    private static StockFactSyncResult CreateSuccessfulFactResult(
+        AShareReference reference)
+        => new(
+            reference.SecurityCode,
+            reference.ExchangeCode,
+            null,
+            [],
+            [],
+            []);
 
     private static StockWatchlistItem CreateStock(
         string securityCode,

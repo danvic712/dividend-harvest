@@ -1,15 +1,12 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
-using DividendHarvest.Application.Exceptions;
+using DividendHarvest.Domain.Securities;
 
 namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockDailyDataSyncAppService(
     IStockWatchlistAppService stockWatchlistAppService,
-    IStockPriceObservationAppService stockPriceObservationAppService,
-    IStockDividendEventAppService stockDividendEventAppService,
-    IStockFinancialSnapshotAppService stockFinancialSnapshotAppService,
-    IApplicationErrorCatalog applicationErrorCatalog,
+    IStockFactSyncAppService stockFactSyncAppService,
     TimeProvider timeProvider) : IStockDailyDataSyncAppService
 {
     public async Task<StockDataSyncRunResult> SyncAsync(
@@ -21,41 +18,12 @@ public sealed class StockDailyDataSyncAppService(
 
         foreach (var stock in watchlist)
         {
-            var request = new SyncStockPriceRequest(
-                stock.SecurityCode,
-                stock.ExchangeCode);
-            var stockFailuresBeforeSync = failures.Count;
+            var result = await stockFactSyncAppService.SyncAsync(
+                AShareReference.Create(stock.SecurityCode, stock.ExchangeCode),
+                cancellationToken);
+            failures.AddRange(result.Failures);
 
-            await TrySyncAsync(
-                stock,
-                "price",
-                () => stockPriceObservationAppService.SyncAsync(
-                    request,
-                    cancellationToken),
-                failures,
-                cancellationToken);
-            await TrySyncAsync(
-                stock,
-                "dividend",
-                () => stockDividendEventAppService.SyncAsync(
-                new SyncStockDividendsRequest(
-                        stock.SecurityCode,
-                        stock.ExchangeCode),
-                    cancellationToken),
-                failures,
-                cancellationToken);
-            await TrySyncAsync(
-                stock,
-                "financial",
-                () => stockFinancialSnapshotAppService.SyncAsync(
-                    new SyncStockFinancialsRequest(
-                        stock.SecurityCode,
-                        stock.ExchangeCode),
-                    cancellationToken),
-                failures,
-                cancellationToken);
-
-            if (failures.Count == stockFailuresBeforeSync)
+            if (result.Failures.Count == 0)
             {
                 fullyCompletedStockCount++;
             }
@@ -72,37 +40,4 @@ public sealed class StockDailyDataSyncAppService(
             timeProvider.GetUtcNow());
     }
 
-    private async Task TrySyncAsync(
-        StockWatchlistItem stock,
-        string dataKind,
-        Func<Task> sync,
-        ICollection<StockDataSyncFailure> failures,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await sync();
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception) when (IsExpectedSyncFailure(exception))
-        {
-            var applicationException = (ApplicationExceptionBase)exception;
-            var localizedError = applicationErrorCatalog.Resolve(applicationException);
-            failures.Add(new StockDataSyncFailure(
-                stock.SecurityCode,
-                stock.ExchangeCode,
-                dataKind,
-                applicationException.ErrorCode,
-                localizedError.Detail));
-        }
-    }
-
-    private static bool IsExpectedSyncFailure(Exception exception)
-        => exception is ApplicationExceptionBase applicationException
-            && ApplicationErrorCodes.ExpectedStockSyncFailures.Contains(
-                applicationException.ErrorCode,
-                StringComparer.Ordinal);
 }
