@@ -1,4 +1,5 @@
 using DividendHarvest.Application;
+using DividendHarvest.Application.Contracts;
 using DividendHarvest.Background;
 using DividendHarvest.Configuration;
 using DividendHarvest.ExceptionHandling;
@@ -64,6 +65,10 @@ public static class HostServiceCollectionExtensions
         services.Configure<DailySyncOptions>(
             configuration.GetSection(DailySyncOptions.SectionName));
         services.AddSingleton<IDailyStockDataSyncRunner, DailyStockDataSyncRunner>();
+        services.AddSingleton<StockDataSyncTaskQueue>();
+        services.AddSingleton<IStockDataSyncScheduler>(serviceProvider =>
+            serviceProvider.GetRequiredService<StockDataSyncTaskQueue>());
+        services.AddHostedService<StockDataSyncBackgroundService>();
         services.AddHostedService<DailyStockDataSyncHostedService>();
         services
             .AddHealthChecks()

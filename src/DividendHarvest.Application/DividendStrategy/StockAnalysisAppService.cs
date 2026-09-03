@@ -141,7 +141,7 @@ public sealed class StockAnalysisAppService(
         return new StockAnalysisResult(
             reference.SecurityCode,
             reference.ExchangeCode,
-            security.SecurityName,
+            GetDisplaySecurityName(security, reference),
             modelStatusCode,
             reliabilityCode,
             priceObservation.ClosePrice,
@@ -209,7 +209,7 @@ public sealed class StockAnalysisAppService(
         => new(
             reference.SecurityCode,
             reference.ExchangeCode,
-            security.SecurityName,
+            GetDisplaySecurityName(security, reference),
             ModelStatusCodes.Unavailable,
             reliabilityCode,
             priceObservation?.ClosePrice,
@@ -232,4 +232,11 @@ public sealed class StockAnalysisAppService(
             computedAt,
             "缺少有效模型参数、行情或 TTM 实际股息，暂不生成价格区域和交易建议。",
             security.Id);
+
+    private static string GetDisplaySecurityName(
+        Security security,
+        AShareReference reference)
+        => string.IsNullOrWhiteSpace(security.SecurityName)
+            ? $"待同步 {reference.SecurityCode}"
+            : security.SecurityName;
 }

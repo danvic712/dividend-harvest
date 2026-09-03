@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { AppShell, SectionHeading } from "@/components/app-shell"
 import { EmptyState, ErrorState, LoadingState } from "@/components/async-state"
 import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { StockSelector } from "@/components/stock-selector"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { formatDateTime, formatMoney, formatNumber, stockKey } from "@/lib/utils"
@@ -12,7 +13,7 @@ import { createRecommendationSnapshot, getBudgetSummary, getRecommendations, get
 import { RecommendationDecision } from "@/features/recommendations/RecommendationDecision"
 import "./recommendations.css"
 
-export function RecommendationsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+export function RecommendationsPage({ onNavigate, notice }: { onNavigate: (path: string) => void; notice?: string | null }) {
   const [stocks, setStocks] = useState<StockWatchlistItem[]>([])
   const [recommendation, setRecommendation] = useState<PortfolioRecommendationResult | null>(null)
   const [budget, setBudget] = useState<BudgetSummary | null>(null)
@@ -67,6 +68,7 @@ export function RecommendationsPage({ onNavigate }: { onNavigate: (path: string)
   return (
     <AppShell currentPath="/overview" onNavigate={onNavigate} lastUpdated={lastUpdated ? formatDateTime(lastUpdated) : null}>
       <div className="d-breadcrumb"><span>我的股票</span><ChevronRight size={13} /><strong>{selectedStock?.securityName ?? "今日决策"}</strong><span>{selectedStock ? `${selectedStock.securityCode}.${selectedStock.exchangeCode} · A 股` : "A 股参考"}</span><div className="d-overview-actions"><Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw data-icon="inline-start" />刷新资料</Button><Button variant="secondary" size="sm" onClick={() => void saveSnapshot()} disabled={savingSnapshot}><Save data-icon="inline-start" />{savingSnapshot ? "保存中…" : "保存快照"}</Button></div></div>
+      {notice && <Alert variant="attention" style={{ marginBottom: 16 }}><AlertTitle>资料同步状态</AlertTitle><AlertDescription>{notice}</AlertDescription></Alert>}
       <StockSelector stocks={stocks} recommendations={recommendation.stocks} selectedKey={selectedKey} onSelect={(stock) => setSelectedKey(stockKey(stock))} />
       <div className="surface recommendation-summary"><div><p className="eyebrow">PORTFOLIO PULSE</p><strong className="summary-number">{formatMoney(recommendation.totalSuggestedTradeAmount)}</strong><p className="muted-copy">当前组合建议记录金额 · {recommendation.stocks.length} 只股票</p></div><div className="summary-side"><div className="summary-side-item"><span>可用预算</span><strong>{formatMoney(recommendation.remainingAvailableBudgetAmount)}</strong></div><div className="summary-side-item"><span>预计费用</span><strong>{formatMoney(recommendation.estimatedTransactionFeeAmount)}</strong></div><div className="summary-side-item"><span>现金余额</span><strong>{formatMoney(budget?.cashBalanceAmount)}</strong></div></div></div>
       {snapshotMessage && <p className="form-message" style={{ margin: "12px 0 0" }}>{snapshotMessage}</p>}

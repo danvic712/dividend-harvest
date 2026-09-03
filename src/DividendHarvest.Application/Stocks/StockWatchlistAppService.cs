@@ -23,11 +23,20 @@ public sealed class StockWatchlistAppService(IUow uow) : IStockWatchlistAppServi
         var holdingsBySecurityId = positions.ToDictionary(position => position.SecurityId);
 
         return securities
-            .Select(security => ApplicationMapper.ToStockWatchlistItem(
-                security,
-                holdingsBySecurityId.TryGetValue(security.Id, out var position)
-                    ? ApplicationMapper.ToStockHoldingSnapshot(position)
-                    : null))
+            .Select(security =>
+            {
+                var item = ApplicationMapper.ToStockWatchlistItem(
+                    security,
+                    holdingsBySecurityId.TryGetValue(security.Id, out var position)
+                        ? ApplicationMapper.ToStockHoldingSnapshot(position)
+                        : null);
+                return item with
+                {
+                    SecurityName = string.IsNullOrWhiteSpace(item.SecurityName)
+                        ? $"待同步 {security.SecurityCode}"
+                        : item.SecurityName
+                };
+            })
             .ToArray();
     }
 }

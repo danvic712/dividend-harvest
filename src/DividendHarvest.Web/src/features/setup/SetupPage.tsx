@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { initializeSetup } from "@/features/setup/setup.api"
-import type { SetupStockRequest } from "@/lib/api-types"
+import type { SetupResult, SetupStockRequest } from "@/lib/api-types"
 import { copy } from "@/lib/i18n"
 import "./setup.css"
 
@@ -14,7 +14,7 @@ function newStock(): SetupStockRequest {
   return { securityCode: "", exchangeCode: "SSE", initialHolding: null }
 }
 
-export function SetupPage({ onComplete }: { onComplete: () => void }) {
+export function SetupPage({ onComplete }: { onComplete: (result: SetupResult) => void }) {
   const [portfolioName, setPortfolioName] = useState("我的股息组合")
   const [stocks, setStocks] = useState<SetupStockRequest[]>([newStock()])
   const [withHolding, setWithHolding] = useState<boolean[]>([false])
@@ -56,8 +56,8 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
 
     setSubmitting(true)
     try {
-      await initializeSetup({ portfolioName: portfolioName.trim(), stocks: stocks.map((stock) => ({ ...stock, securityCode: stock.securityCode.trim(), exchangeCode: stock.exchangeCode.trim().toUpperCase() })) })
-      onComplete()
+      const result = await initializeSetup({ portfolioName: portfolioName.trim(), stocks: stocks.map((stock) => ({ ...stock, securityCode: stock.securityCode.trim(), exchangeCode: stock.exchangeCode.trim().toUpperCase() })) })
+      onComplete(result)
     } catch (submitError) {
       setError(getApiErrorMessage(submitError, "初始化失败，请确认股票代码和交易所后重试。"))
     } finally {
@@ -92,7 +92,7 @@ export function SetupPage({ onComplete }: { onComplete: () => void }) {
               ))}
             </div>
             <Button className="form-grid-wide" variant="outline" onClick={addStock}><Plus data-icon="inline-start" />继续添加股票</Button>
-            <div className="form-actions"><Button size="lg" onClick={submit} disabled={submitting}>{submitting ? "正在建立…" : "建立我的组合"}</Button><span className="form-message">首次同步会在后台获取资料。</span></div>
+            <div className="form-actions"><Button size="lg" onClick={submit} disabled={submitting}>{submitting ? "正在建立…" : "建立我的组合"}</Button><span className="form-message">组合会先立即建立；股票名称、行情和股息资料将在后台同步，不会阻塞进入系统。</span></div>
           </div>
           <p className="setup-footnote">股票代码仅支持 6 位数字；交易所用于区分同代码证券。该页面不会接收或保存 FTShare 密钥。</p>
         </section>

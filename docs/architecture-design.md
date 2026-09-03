@@ -86,6 +86,7 @@ src/
 │   │   ├── ISetupAppService.cs
 │   │   ├── IStockDataProvider.cs
 │   │   ├── IStockDataProviderFailure.cs
+│   │   ├── IStockDataSyncScheduler.cs
 │   │   ├── IStockWatchlistAppService.cs
 │   │   ├── IStockModelParameterAppService.cs
 │   │   ├── IStockPriceObservationAppService.cs
@@ -149,7 +150,9 @@ src/
     │   └── PortfolioController.cs
     ├── Background/                     # ASP.NET Core 后台调度
     │   ├── DailyStockDataSyncHostedService.cs
-    │   └── DailyStockDataSyncRunner.cs
+    │   ├── DailyStockDataSyncRunner.cs
+    │   ├── StockDataSyncBackgroundService.cs
+    │   └── StockDataSyncTaskQueue.cs
     ├── Contracts/                      # Host 层可替换边界
     │   ├── IDailyStockDataSyncRunner.cs
     │   └── IHttpErrorRenderer.cs
@@ -168,13 +171,13 @@ src/
 │   └── src/lib/                        # Axios client、DTO 类型和共享展示工具
 ```
 
-Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 HTTP 契约：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和结果类型；三类事实的共同摄取、Security 解析、FTShare 调用、幂等写入和逐类失败策略由 `IStockFactSyncAppService` / `StockFactSyncAppService` 这个深模块承载，三个 HTTP AppService 只是验证后转发。单股分析、组合分配和建议快照也保持独立的用例边界。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。前端按相同的业务边界拆分 feature，但只通过版本化 HTTP API 访问后端，不直接引用 Application 或 Infrastructure。
+Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 HTTP 契约：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和结果类型；资料、行情、股息和财务四类事实的共同摄取、Security 解析、FTShare 调用、幂等写入和逐类失败策略由 `IStockFactSyncAppService` / `StockFactSyncAppService` 这个深模块承载，三个 HTTP AppService 只是验证后转发。单股分析、组合分配和建议快照也保持独立的用例边界。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。前端按相同的业务边界拆分 feature，但只通过版本化 HTTP API 访问后端，不直接引用 Application 或 Infrastructure。
 
 前端使用 Node `24.16.0` 与 pnpm `11.19.0` 构建静态资源，输出到 Host 的 `wwwroot/`；该目录是构建产物并保持本地生成，不提交源代码仓库。根目录 `Dockerfile` 使用 Node Alpine、.NET SDK Alpine 和 ASP.NET Core Alpine 三阶段构建：前两阶段只负责编译，最终镜像只保留 .NET publish 输出，因此不会携带 Node、pnpm、源码或测试依赖。单镜像构建流程必须先完成前端构建，再执行 ASP.NET Core publish；开发预览使用 Vite proxy 将 `/api` 转发到本地 Host。
 
-`Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；交易日同步通过 `IStockFactSyncAppService.SyncAsync` 一次传递单只股票的规范化引用，并消费包含三类结果和逐类失败的 `StockFactSyncResult`。如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
+`Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；交易日同步通过 `IStockFactSyncAppService.SyncAsync` 一次传递单只股票的规范化引用，并消费包含资料、行情、股息、财务结果和逐类失败的 `StockFactSyncResult`。如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
 
-各层的依赖注入通过对应的扩展类集中注册：Application 使用 `ApplicationServiceCollectionExtensions.AddDividendHarvestApplication`，Infrastructure 使用 `InfrastructureServiceCollectionExtensions.AddDividendHarvestInfrastructure`，Host 使用 `HostServiceCollectionExtensions.AddDividendHarvestHost`。Host 另提供 `HostServiceCollectionExtensions.AddDividendHarvest(WebApplicationBuilder)` 作为启动组合入口，按固定顺序组合三层注册。Host 对 `WebApplication` 的异常处理中间件、Controller/健康检查路由和数据库初始化统一放在 `WebApplicationExtensions`；定时同步通过 `DailyStockDataSyncRunner` 集中创建 scoped 生命周期并解析应用服务；`Program.cs` 只保留配置构建、组合扩展调用、应用构建和启动顺序。
+各层的依赖注入通过对应的扩展类集中注册：Application 使用 `ApplicationServiceCollectionExtensions.AddDividendHarvestApplication`，Infrastructure 使用 `InfrastructureServiceCollectionExtensions.AddDividendHarvestInfrastructure`，Host 使用 `HostServiceCollectionExtensions.AddDividendHarvestHost`。Host 另提供 `HostServiceCollectionExtensions.AddDividendHarvest(WebApplicationBuilder)` 作为启动组合入口，按固定顺序组合三层注册。Host 对 `WebApplication` 的异常处理中间件、Controller/健康检查路由和数据库初始化统一放在 `WebApplicationExtensions`；定时同步和 Setup 后台同步都通过 `DailyStockDataSyncRunner` 集中创建 scoped 生命周期并解析应用服务，运行器内部串行化执行，避免两个同步任务同时写库；`Program.cs` 只保留配置构建、组合扩展调用、应用构建和启动顺序。
 
 公共基础能力也遵循相同的组合边界：Swagger/Serilog 注册在 `HostServiceCollectionExtensions`，Swagger UI、Serilog HTTP 请求日志中间件和其他 `WebApplication` 行为在 `WebApplicationExtensions`；Application 的 Mapperly 映射定义集中在 `Mapping/ApplicationMapper.cs`，由构建期生成实际映射代码。
 
@@ -359,12 +362,12 @@ ISetupAppService
         ▼
 SetupAppService
         ├── IUow.Get<Portfolio>() 检查是否已完成建账
-        ├── IStockDataProvider 获取并校验每只 A 股资料
-        ├── IUow.Get<TEntity>() 添加组合、股票和期初持仓
-        └── IUow.CommitAsync() 一次提交
+        ├── IUow.Get<TEntity>() 添加组合、股票占位资料和期初持仓
+        ├── IUow.CommitAsync() 一次提交
+        └── IStockDataSyncScheduler.TrySchedule() 投递后台同步触发器
 ```
 
-外部资料在进入实体前先被规范化为 Application DTO；DTO 通过校验后才转换为 Domain Model。任何 FTShare 失败都不会产生部分持久化写入。
+Setup 不调用 `IStockDataProvider`，因此 FTShare 未配置、暂时不可用或响应较慢都不会阻塞用户完成初始化。Setup 只保存 A 股代码、交易所、A-share/CNY 基础占位值和可选期初持仓，并在提交成功后以非阻塞方式投递后台同步；队列已满时仅把 `stockDataSyncScheduled` 返回为 `false`，初始化数据仍然保留，后续交易日同步和手动同步仍可尝试。后台同步再通过 `IStockFactSyncAppService` 获取并校验每只股票的资料、行情、股息和财务数据，资料成功后以显式 `asNoTracking: false` 加载并更新 `Security`，缺失资料时关注列表显示 `待同步 {securityCode}`，不伪造股票名称。
 
 ### 8.1 Controller 与请求验证
 
@@ -422,7 +425,7 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 ### 8.10 交易日数据同步
 
-`IStockDailyDataSyncAppService` 按关注列表逐只调用 `IStockFactSyncAppService`；事实同步模块按股票复用一次 Security 上下文，分别执行行情、股息和财务快照同步。失败项记录股票、数据类型、稳定 `error_code` 和结构化 `parameters`，不在后台结果中固化某一种语言的展示文案；HTTP 入口由 `IApplicationErrorLocalizer` 按 `Accept-Language` 生成文本，后台日志和其他非 HTTP 消费者使用默认语言在展示边界本地化。其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计三类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
+`IStockDailyDataSyncAppService` 按关注列表逐只调用 `IStockFactSyncAppService`；事实同步模块按股票复用一次 Security 上下文，依次执行资料、行情、股息和财务快照同步。失败项记录股票、数据类型、稳定 `error_code` 和结构化 `parameters`，不在后台结果中固化某一种语言的展示文案；HTTP 入口由 `IApplicationErrorLocalizer` 按 `Accept-Language` 生成文本，后台日志和其他非 HTTP 消费者使用默认语言在展示边界本地化。其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计四类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
 
 股票事实与建议的 Application 数据流如下：
 
@@ -431,8 +434,8 @@ StockDailyDataSyncAppService ──┐
                                ▼
                      StockFactSyncAppService
                                ├── Security 上下文
-                               ├── FTShare market/dividend/financial
-                               └── 三类事实幂等写入
+                               ├── FTShare profile/market/dividend/financial
+                               └── 四类事实幂等写入
 
 StockAnalysisAppService ──> StockAnalysisResult(+ SecurityId)
                                       │
@@ -445,7 +448,7 @@ PortfolioRecommendationAppService ────┴──> PortfolioAllocationAppS
                                       (直接使用同一分析结果写入快照)
 ```
 
-Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailySync:TimeZoneId` 调度，默认使用上海时间每日 18:00，并跳过周末；A 股法定节假日由数据源实际返回结果决定，重复快照通过事实同步用例幂等处理。生产环境可以通过 `DailySync:Enabled=false` 关闭后台调度而保留手动接口。
+Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailySync:TimeZoneId` 调度，默认使用上海时间每日 18:00，并跳过周末；A 股法定节假日由数据源实际返回结果决定，重复快照通过事实同步用例幂等处理。`StockDataSyncBackgroundService` 监听有界队列，在 Setup 提交后执行一次即时后台同步；它与每日同步共享 `DailyStockDataSyncRunner` 的串行闸门。生产环境可以通过 `DailySync:Enabled=false` 关闭定时调度，但 Setup 后的一次性队列同步和手动接口仍然可用；后台异常只记录安全的运行摘要，详细的逐项失败仍由手动同步接口返回，后续运行会重试。
 
 ### 8.11 交易记录与持仓成本
 
@@ -514,7 +517,7 @@ Host 的 `ApplicationExceptionHandler` 只负责识别 Application 异常、调�
 
 `IDiagnosticContext` 位于 `Application/Contracts/`，Host 使用 `SerilogDiagnosticContext` 实现，并在 `HostServiceCollectionExtensions` 中注册。它只允许写入固定的安全字段：
 
-- `diagnostic_operation`、`correlation_id`、`run_id`、`error_code`、`severity`；其中操作只允许 `http_request`、`http_error`、`daily_stock_data_sync` 和 `ftshare_mcp`。
+- `diagnostic_operation`、`correlation_id`、`run_id`、`error_code`、`severity`；其中操作只允许 `http_request`、`http_error`、`daily_stock_data_sync`、`stock_data_sync` 和 `ftshare_mcp`。
 - A 股 `security_code`、`exchange_code` 和有限集合的 `data_kind`（`profile`、`market`、`dividend`、`financial`）。
 
 `WebApplicationExtensions` 为每个 HTTP 请求创建 correlation scope 并返回 `X-Correlation-Id`；Application 异常响应同时返回 `trace_id`。`DailyStockDataSyncHostedService` 为每次交易日同步创建独立 run scope；`FtShareStockDataProvider` 为每次资料、行情、股息和财务 MCP 调用追加股票引用和数据类型。诊断上下文不接受任意字典，超过长度、包含不允许字符或不在有限集合中的值会被丢弃；内部日志最多记录异常类型和 cause type，不记录异常消息，避免把请求正文、持仓数量、认证信息、FTShare key、原始响应和内部异常文本带入日志或 ProblemDetails。

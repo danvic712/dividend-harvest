@@ -11,6 +11,7 @@ public sealed class SerilogDiagnosticContext : IDiagnosticContext
         "http_request",
         "http_error",
         "daily_stock_data_sync",
+        "stock_data_sync",
         "ftshare_mcp"
     ];
 

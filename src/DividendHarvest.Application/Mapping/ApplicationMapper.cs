@@ -45,8 +45,4 @@ public static partial class ApplicationMapper
         string? securityCode,
         string? exchangeCode);
 
-    public static partial SetupStockResult ToSetupStockResult(
-        StockData stockData,
-        string securityCode,
-        string exchangeCode);
 }

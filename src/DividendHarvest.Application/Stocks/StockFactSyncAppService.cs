@@ -12,14 +12,17 @@ public sealed class StockFactSyncAppService(
     IUow uow,
     IStockDataProvider stockDataProvider) : IStockFactSyncAppService
 {
-    private static readonly string[] DataKinds = ["price", "dividend", "financial"];
+    private static readonly string[] DataKinds = ["profile", "price", "dividend", "financial"];
 
     public async Task<StockFactSyncResult> SyncAsync(
         AShareReference reference,
         CancellationToken cancellationToken)
     {
         var failures = new List<StockDataSyncFailure>();
-        var security = await FindSecurityAsync(reference, cancellationToken);
+        var security = await FindSecurityAsync(
+            reference,
+            cancellationToken,
+            asNoTracking: false);
         if (security is null)
         {
             var exception = ApplicationErrors.WithSecurityReference(
@@ -44,6 +47,12 @@ public sealed class StockFactSyncAppService(
         var dividendEvents = Array.Empty<StockDividendEventResult>();
         var financialSnapshots = Array.Empty<StockFinancialSnapshotResult>();
 
+        await TrySyncAsync(
+            reference,
+            "profile",
+            async () => await SyncProfileAsync(reference, security, cancellationToken),
+            failures,
+            cancellationToken);
         await TrySyncAsync(
             reference,
             "price",
@@ -107,11 +116,13 @@ public sealed class StockFactSyncAppService(
 
     private async Task<Security?> FindSecurityAsync(
         AShareReference reference,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool asNoTracking = true)
         => await uow.Get<Security>().SingleOrDefaultAsync(
             item => item.SecurityCode == reference.SecurityCode
                 && item.ExchangeCode == reference.ExchangeCode,
-            cancellationToken);
+            cancellationToken,
+            asNoTracking);
 
     private async Task<Security> GetSecurityAsync(
         AShareReference reference,
@@ -121,6 +132,50 @@ public sealed class StockFactSyncAppService(
                 ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
+
+    private async Task SyncProfileAsync(
+        AShareReference reference,
+        Security security,
+        CancellationToken cancellationToken)
+    {
+        StockData? stockData;
+        try
+        {
+            stockData = await stockDataProvider.GetAsync(reference, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IStockDataProviderFailure)
+        {
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockDataUnavailable,
+                reference.SecurityCode,
+                exception);
+        }
+
+        if (stockData is null
+            || !MatchesReference(reference, stockData)
+            || string.IsNullOrWhiteSpace(stockData.SecurityName)
+            || string.IsNullOrWhiteSpace(stockData.MarketCode)
+            || string.IsNullOrWhiteSpace(stockData.CurrencyCode))
+        {
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockDataUnavailable,
+                reference.SecurityCode);
+        }
+
+        if (security.SecurityName == stockData.SecurityName
+            && security.MarketCode == stockData.MarketCode
+            && security.CurrencyCode == stockData.CurrencyCode
+            && security.SectorCode == stockData.SectorCode)
+        {
+            return;
+        }
+
+        security.SecurityName = stockData.SecurityName;
+        security.MarketCode = stockData.MarketCode;
+        security.CurrencyCode = stockData.CurrencyCode;
+        security.SectorCode = stockData.SectorCode;
+        await uow.CommitAsync(cancellationToken);
+    }
 
     private async Task<StockPriceObservationResult> SyncPriceAsync(
         AShareReference reference,
@@ -441,6 +496,11 @@ public sealed class StockFactSyncAppService(
             && ApplicationErrorCodes.ExpectedStockSyncFailures.Contains(
                 applicationException.ErrorCode,
                 StringComparer.Ordinal);
+
+    private static bool MatchesReference(
+        AShareReference reference,
+        StockData stockData)
+        => MatchesReference(reference, stockData.SecurityCode, stockData.ExchangeCode);
 
     private static bool MatchesReference(
         AShareReference reference,

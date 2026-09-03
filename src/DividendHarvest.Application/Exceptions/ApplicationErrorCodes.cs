@@ -46,6 +46,7 @@ public static class ApplicationErrorCodes
 
     public static IReadOnlyList<string> ExpectedStockSyncFailures { get; } =
     [
+        StockDataUnavailable,
         StockMarketDataUnavailable,
         StockDividendDataUnavailable,
         StockFinancialDataUnavailable,

@@ -105,6 +105,34 @@ public sealed class StockWatchlistAppServiceTests
         Assert.Equal(["SSE", "SZSE"], result.Select(item => item.ExchangeCode));
     }
 
+    [Fact]
+    public async Task GetAsync_uses_pending_name_when_profile_has_not_synced()
+    {
+        var securityRepository = CreateRepository<Security>([
+            new Security
+            {
+                Id = Guid.NewGuid(),
+                SecurityCode = "000001",
+                ExchangeCode = "SZSE",
+                SecurityName = string.Empty,
+                MarketCode = "A-share",
+                CurrencyCode = "CNY"
+            }
+        ]);
+        var positionRepository = CreateRepository<PortfolioPosition>([]);
+        var unitOfWork = new Mock<IUow>();
+        unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
+        unitOfWork
+            .Setup(x => x.Get<PortfolioPosition>())
+            .Returns(positionRepository.Object);
+
+        var result = await new StockWatchlistAppService(unitOfWork.Object)
+            .GetAsync(CancellationToken.None);
+
+        var stock = Assert.Single(result);
+        Assert.Equal("待同步 000001", stock.SecurityName);
+    }
+
     private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(IEnumerable<TEntity> entities)
         where TEntity : class
         => RepositoryMock.Create(entities);

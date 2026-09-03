@@ -43,17 +43,12 @@ public sealed class SetupAppServiceTests
     public async Task InitializeAsync_saves_multiple_stocks_and_optional_initial_holding_atomically()
     {
         var repository = CreatePortfolioRepository(hasPortfolio: false);
-        var provider = new Mock<IStockDataProvider>();
-        provider
-            .Setup(x => x.GetAsync(It.Is<AShareReference>(r => r.SecurityCode == "000001"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new StockData("000001", "SZSE", "平安银行", "A-share", "CNY"));
-        provider
-            .Setup(x => x.GetAsync(It.Is<AShareReference>(r => r.SecurityCode == "600036"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new StockData("600036", "SSE", "招商银行", "A-share", "CNY"));
         var securityRepository = new Mock<IRepository<Security>>();
         var positionRepository = new Mock<IRepository<PortfolioPosition>>();
         var unitOfWork = CreateUnitOfWork(repository, securityRepository, positionRepository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
+        var scheduler = new Mock<IStockDataSyncScheduler>();
+        scheduler.Setup(x => x.TrySchedule()).Returns(true);
+        var service = new SetupAppService(unitOfWork.Object, scheduler.Object, CreateRequestValidator());
         var request = new SetupRequest(
             "长期股息组合",
             [
@@ -64,24 +59,33 @@ public sealed class SetupAppServiceTests
         var result = await service.InitializeAsync(request, CancellationToken.None);
 
         Assert.Equal("长期股息组合", result.PortfolioName);
+        Assert.True(result.StockDataSyncScheduled);
         Assert.Equal(2, result.Stocks.Count);
-        Assert.Equal("平安银行", result.Stocks[0].SecurityName);
+        Assert.Null(result.Stocks[0].SecurityName);
         repository.Verify(x => x.AddAsync(
             It.Is<PortfolioEntity>(portfolio => portfolio.Name == "长期股息组合"),
             It.IsAny<CancellationToken>()), Times.Once);
         securityRepository.Verify(x => x.AddAsync(It.IsAny<Security>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        securityRepository.Verify(x => x.AddAsync(
+            It.Is<Security>(security =>
+                security.SecurityCode == "000001"
+                && security.SecurityName == string.Empty
+                && security.MarketCode == "A-share"
+                && security.CurrencyCode == "CNY"),
+            It.IsAny<CancellationToken>()), Times.Once);
         positionRepository.Verify(x => x.AddAsync(
             It.Is<PortfolioPosition>(position => position.HeldShares == 100 && position.CoreShares == 60),
             It.IsAny<CancellationToken>()), Times.Once);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        scheduler.Verify(x => x.TrySchedule(), Times.Once);
     }
 
     [Fact]
-    public async Task InitializeAsync_rejects_duplicate_stocks_before_fetching_data()
+    public async Task InitializeAsync_rejects_duplicate_stocks_before_scheduling_sync()
     {
         var repository = CreatePortfolioRepository(hasPortfolio: false);
-        var provider = new Mock<IStockDataProvider>();
-        var service = CreateService(repository, provider);
+        var scheduler = new Mock<IStockDataSyncScheduler>();
+        var service = CreateService(repository, scheduler);
         var request = new SetupRequest(
             "长期股息组合",
             [
@@ -91,75 +95,71 @@ public sealed class SetupAppServiceTests
 
         await Assert.ThrowsAsync<ApplicationValidationException>(() => service.InitializeAsync(request, CancellationToken.None));
 
-        provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        scheduler.Verify(x => x.TrySchedule(), Times.Never);
     }
 
     [Fact]
     public async Task InitializeAsync_does_not_write_when_setup_is_already_complete()
     {
         var repository = CreatePortfolioRepository(hasPortfolio: true);
-        var provider = new Mock<IStockDataProvider>();
+        var scheduler = new Mock<IStockDataSyncScheduler>();
         var unitOfWork = CreateUnitOfWork(repository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
+        var service = new SetupAppService(unitOfWork.Object, scheduler.Object, CreateRequestValidator());
 
         await Assert.ThrowsAsync<ApplicationErrorException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
-        provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        scheduler.Verify(x => x.TrySchedule(), Times.Never);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task InitializeAsync_does_not_write_when_stock_data_is_unavailable()
+    public async Task InitializeAsync_succeeds_without_stock_provider_data()
     {
         var repository = CreatePortfolioRepository(hasPortfolio: false);
-        var provider = new Mock<IStockDataProvider>();
-        provider
-            .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StockData?)null);
+        var scheduler = new Mock<IStockDataSyncScheduler>();
+        scheduler.Setup(x => x.TrySchedule()).Returns(true);
         var unitOfWork = CreateUnitOfWork(repository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
+        var service = new SetupAppService(unitOfWork.Object, scheduler.Object, CreateRequestValidator());
 
-        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.InitializeAsync(
+        var result = await service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
-            CancellationToken.None));
+            CancellationToken.None);
 
-        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.True(result.StockDataSyncScheduled);
+        Assert.Null(result.Stocks[0].SecurityName);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task InitializeAsync_translates_provider_failure_without_writing()
+    public async Task InitializeAsync_succeeds_when_background_sync_cannot_be_scheduled()
     {
         var repository = CreatePortfolioRepository(hasPortfolio: false);
-        var provider = new Mock<IStockDataProvider>();
-        provider
-            .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new TestStockDataProviderFailureException(
-                new TimeoutException("FTShare MCP 请求超时。")));
+        var scheduler = new Mock<IStockDataSyncScheduler>();
+        scheduler.Setup(x => x.TrySchedule()).Returns(false);
         var unitOfWork = CreateUnitOfWork(repository);
-        var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
+        var service = new SetupAppService(unitOfWork.Object, scheduler.Object, CreateRequestValidator());
 
-        var exception = await Assert.ThrowsAsync<ApplicationErrorException>(() => service.InitializeAsync(
+        var result = await service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
-            CancellationToken.None));
+            CancellationToken.None);
 
-        Assert.Equal(ApplicationErrorCodes.StockDataUnavailable, exception.ErrorCode);
-        Assert.IsAssignableFrom<IStockDataProviderFailure>(exception.InnerException);
-        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
-        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.False(result.StockDataSyncScheduled);
+        unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task InitializeAsync_validates_request_before_checking_setup_status()
     {
         var repository = CreatePortfolioRepository(hasPortfolio: false);
-        var provider = new Mock<IStockDataProvider>();
+        var scheduler = new Mock<IStockDataSyncScheduler>();
         var unitOfWork = CreateUnitOfWork(repository);
         var service = new SetupAppService(
             unitOfWork.Object,
-            provider.Object,
+            scheduler.Object,
             CreateRequestValidator());
 
         var exception = await Assert.ThrowsAsync<ApplicationValidationException>(() => service.InitializeAsync(
@@ -170,17 +170,17 @@ public sealed class SetupAppServiceTests
             "投资组合名称必须为 1 到 100 个字符。",
             exception.Parameters["message"]?.ToString());
         unitOfWork.Verify(x => x.Get<PortfolioEntity>(), Times.Never);
-        provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
+        scheduler.Verify(x => x.TrySchedule(), Times.Never);
     }
 
     private static SetupAppService CreateService(
         Mock<IRepository<PortfolioEntity>> repository,
-        Mock<IStockDataProvider>? provider = null)
+        Mock<IStockDataSyncScheduler>? scheduler = null)
     {
         var unitOfWork = CreateUnitOfWork(repository);
         return new SetupAppService(
             unitOfWork.Object,
-            (provider ?? new Mock<IStockDataProvider>()).Object,
+            (scheduler ?? new Mock<IStockDataSyncScheduler>()).Object,
             CreateRequestValidator());
     }
 
@@ -219,7 +219,4 @@ public sealed class SetupAppServiceTests
             .ReturnsAsync(3);
         return unitOfWork;
     }
-
-    private sealed class TestStockDataProviderFailureException(Exception innerException)
-        : Exception(null, innerException), IStockDataProviderFailure;
 }

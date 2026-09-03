@@ -24,10 +24,11 @@ export type InitialHoldingInput = {
 export type SetupResult = {
   portfolioId: string
   portfolioName: string
+  stockDataSyncScheduled: boolean
   stocks: Array<{
     securityCode: string
     exchangeCode: string
-    securityName: string
+    securityName: string | null
   }>
 }
 
