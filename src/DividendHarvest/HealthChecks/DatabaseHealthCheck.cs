@@ -1,9 +1,9 @@
-using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Infrastructure.Contracts;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace DividendHarvest.HealthChecks;
 
-public sealed class DatabaseHealthCheck(IUow uow) : IHealthCheck
+public sealed class DatabaseHealthCheck(IDatabaseLifecycle databaseLifecycle) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -11,7 +11,7 @@ public sealed class DatabaseHealthCheck(IUow uow) : IHealthCheck
     {
         try
         {
-            return await uow.CanConnectAsync(cancellationToken)
+            return await databaseLifecycle.CanConnectAsync(cancellationToken)
                 ? HealthCheckResult.Healthy()
                 : HealthCheckResult.Unhealthy("数据库不可用。");
         }

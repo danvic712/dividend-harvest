@@ -19,6 +19,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddDbContext<DividendHarvestDbContext>(options =>
             options.UseSqlite(connectionString));
         services.AddScoped<IUow, Repositories.EFUow>();
+        services.AddScoped<IDatabaseLifecycle, DatabaseLifecycle>();
 
         services
             .AddOptions<FtShare.FtShareOptions>()

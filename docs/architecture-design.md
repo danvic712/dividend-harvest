@@ -126,12 +126,14 @@ src/
 │       └── RecommendationSnapshotAppService.cs
 ├── DividendHarvest.Infrastructure/
 │   ├── Contracts/                      # Infrastructure Adapter Interface
+│   │   ├── IDatabaseLifecycle.cs
 │   │   └── IFtShareMcpToolInvoker.cs
 │   ├── Configurations/                 # EF Core Fluent Entity Configuration
 │   ├── Repositories/                   # Repository、Uow 实现
 │   │   ├── EFRepository.cs
 │   │   └── EFUow.cs
 │   ├── InfrastructureServiceCollectionExtensions.cs
+│   ├── DatabaseLifecycle.cs             # 数据库创建、兼容升级和连接检查
 │   ├── DividendHarvestDbContext.cs     # EF Core DbContext
 │   ├── Exceptions/                     # Infrastructure Adapter 异常
 │   │   └── FtShareProviderException.cs
@@ -146,8 +148,10 @@ src/
     │   ├── RecommendationsController.cs
     │   └── PortfolioController.cs
     ├── Background/                     # ASP.NET Core 后台调度
-    │   └── DailyStockDataSyncHostedService.cs
+    │   ├── DailyStockDataSyncHostedService.cs
+    │   └── DailyStockDataSyncRunner.cs
     ├── Contracts/                      # Host 层可替换边界
+    │   ├── IDailyStockDataSyncRunner.cs
     │   └── IHttpErrorRenderer.cs
     ├── Diagnostics/                    # 隐私感知的 Serilog 诊断上下文
     │   └── SerilogDiagnosticContext.cs
@@ -163,7 +167,7 @@ Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfo
 
 `Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；交易日同步通过 `IStockFactSyncAppService.SyncAsync` 一次传递单只股票的规范化引用，并消费包含三类结果和逐类失败的 `StockFactSyncResult`。如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
 
-各层的依赖注入通过对应的扩展类集中注册：Application 使用 `ApplicationServiceCollectionExtensions.AddDividendHarvestApplication`，Infrastructure 使用 `InfrastructureServiceCollectionExtensions.AddDividendHarvestInfrastructure`，Host 使用 `HostServiceCollectionExtensions.AddDividendHarvestHost`。Host 对 `WebApplication` 的异常处理中间件、Controller/健康检查路由和数据库初始化统一放在 `WebApplicationExtensions`；`Program.cs` 只保留配置构建、扩展调用、应用构建和启动顺序。
+各层的依赖注入通过对应的扩展类集中注册：Application 使用 `ApplicationServiceCollectionExtensions.AddDividendHarvestApplication`，Infrastructure 使用 `InfrastructureServiceCollectionExtensions.AddDividendHarvestInfrastructure`，Host 使用 `HostServiceCollectionExtensions.AddDividendHarvestHost`。Host 另提供 `HostServiceCollectionExtensions.AddDividendHarvest(WebApplicationBuilder)` 作为启动组合入口，按固定顺序组合三层注册。Host 对 `WebApplication` 的异常处理中间件、Controller/健康检查路由和数据库初始化统一放在 `WebApplicationExtensions`；定时同步通过 `DailyStockDataSyncRunner` 集中创建 scoped 生命周期并解析应用服务；`Program.cs` 只保留配置构建、组合扩展调用、应用构建和启动顺序。
 
 公共基础能力也遵循相同的组合边界：Swagger/Serilog 注册在 `HostServiceCollectionExtensions`，Swagger UI、Serilog HTTP 请求日志中间件和其他 `WebApplication` 行为在 `WebApplicationExtensions`；Application 的 Mapperly 映射定义集中在 `Mapping/ApplicationMapper.cs`，由构建期生成实际映射代码。
 
@@ -252,10 +256,6 @@ public interface IUow
     IRepository<TEntity> Get<TEntity>() where TEntity : class;
 
     Task<int> CommitAsync(CancellationToken cancellationToken = default);
-
-    Task<bool> CanConnectAsync(CancellationToken cancellationToken = default);
-
-    Task EnsureCreatedAsync(CancellationToken cancellationToken = default);
 }
 ```
 
@@ -290,6 +290,7 @@ SetupAppService
 - `EFUow.CommitAsync` 统一调用 `SaveChangesAsync`；数据库更新失败在 Infrastructure 转换为 Domain 的 `UnitOfWorkCommitException`，并只标记可识别的 SQLite 唯一约束失败；Application 不引用 `DbUpdateException`。
 - 一个用例的多个实体写入在一次提交中完成；Repository 不提前提交，也不把可延迟执行的查询对象交给调用方。
 - `DividendHarvestDbContext` 位于 Infrastructure 根目录；`EFRepository<TEntity>` 和 `EFUow` 位于 `Infrastructure/Repositories/`，均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
+- `DatabaseLifecycle` 位于 Infrastructure 根目录，负责数据库连接检查、`EnsureCreated` 和 SQLite 兼容升级；它与 `EFUow` 分离，避免业务事务抽象承担宿主生命周期职责。
 - Host 的 `/healthz`、`/readyz` 使用 ASP.NET Core 原生 Health Checks；数据库健康检查通过 Infrastructure 的 `IDatabaseLifecycle.CanConnectAsync` 实现。健康检查是运行状态入口，不属于业务 API 版本范围。
 - Host 的启动建库只能通过 Infrastructure 的 `IDatabaseLifecycle.EnsureCreatedAsync`，不直接解析 DbContext，也不让 `IUow` 承担数据库生命周期职责。
 - `DatabaseLifecycle.EnsureCreatedAsync` 在 SQLite 启动时执行幂等的兼容升级，为既有 `/app/data` 数据库补齐新增字段、默认值和现金流水幂等唯一索引；未来新增表结构必须沿用可回放的迁移/升级步骤，不能只修改 Fluent Configuration。
@@ -498,7 +499,7 @@ Application 自定义异常统一位于 `Application/Exceptions/`，但不再为
 
 错误码仍然按业务语义细分，例如 `stock_market_data_unavailable` 和 `portfolio_trade_conflict`，但错误码与异常类型解耦。这样既保留 `locales/{culture}/{domain}.json`、HTTP 状态和参数占位符的精确语义，也避免大量只重复错误码和字典参数的类。目录加载时校验 `ApplicationErrorCodes.All` 与语言 JSON 的完整集合，而不是反射扫描异常类属性。
 
-Host 的 `ApplicationExceptionHandler` 只负责识别 Application 异常、调用 `IApplicationErrorCatalog` 解析语言和参数、记录安全的结构化日志，并把已解析的安全结果交给 `IHttpErrorRenderer`。renderer 不接收原始 `Exception`，`ProblemDetailsErrorRenderer` 只负责 HTTP 响应形状，返回目录解析出的 `status`、`title`、`detail`、稳定 `error_code`、`locale` 和 `trace_id`。验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
+Host 的 `ApplicationExceptionHandler` 只负责识别 Application 异常、调用 `IApplicationErrorLocalizer` 生成语言和参数已解析的结果、记录安全的结构化日志，并把已解析的安全结果交给 `IHttpErrorRenderer`。renderer 不接收原始 `Exception`，`ProblemDetailsErrorRenderer` 只负责 HTTP 响应形状，返回目录解析出的 `status`、`title`、`detail`、稳定 `error_code`、`locale` 和 `trace_id`。验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 
 新增错误时，只需在 `ApplicationErrorCodes` 添加稳定码、在每个受支持语言的对应领域 JSON 中定义它、通过 `ApplicationErrors` 选择结构化参数工厂并补充 Application 单元测试。缺少错误码定义、重复定义、跨语言状态码/占位符不一致、非法状态码或空文本应在目录加载时直接失败，而不是运行到请求时才产生隐性回退。
 

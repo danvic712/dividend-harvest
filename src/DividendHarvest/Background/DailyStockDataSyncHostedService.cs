@@ -3,12 +3,13 @@ using DividendHarvest.Application.Diagnostics;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Application.Stocks;
 using DividendHarvest.Configuration;
+using DividendHarvest.Contracts;
 using Microsoft.Extensions.Options;
 
 namespace DividendHarvest.Background;
 
 public sealed class DailyStockDataSyncHostedService(
-    IServiceScopeFactory serviceScopeFactory,
+    IDailyStockDataSyncRunner syncRunner,
     IOptions<DailySyncOptions> options,
     TimeProvider timeProvider,
     ILogger<DailyStockDataSyncHostedService> logger,
@@ -60,10 +61,7 @@ public sealed class DailyStockDataSyncHostedService(
 
         try
         {
-            await using var scope = serviceScopeFactory.CreateAsyncScope();
-            var syncAppService = scope.ServiceProvider
-                .GetRequiredService<IStockDailyDataSyncAppService>();
-            var result = await syncAppService.SyncAsync(cancellationToken);
+            var result = await syncRunner.RunAsync(cancellationToken);
             logger.LogInformation(
                 "Daily stock data synchronization finished. RunId: {RunId}, attempted: {Attempted}, completed: {Completed}, failed: {Failed}.",
                 runId,

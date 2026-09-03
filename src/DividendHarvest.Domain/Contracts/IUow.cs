@@ -6,8 +6,4 @@ public interface IUow
         where TEntity : class;
 
     Task<int> CommitAsync(CancellationToken cancellationToken = default);
-
-    Task<bool> CanConnectAsync(CancellationToken cancellationToken = default);
-
-    Task EnsureCreatedAsync(CancellationToken cancellationToken = default);
 }

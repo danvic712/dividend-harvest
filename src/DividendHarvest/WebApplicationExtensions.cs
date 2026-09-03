@@ -1,6 +1,6 @@
-using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Diagnostics;
+using DividendHarvest.Infrastructure.Contracts;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -66,7 +66,17 @@ public static class WebApplicationExtensions
         CancellationToken cancellationToken = default)
     {
         await using var scope = app.Services.CreateAsyncScope();
-        var uow = scope.ServiceProvider.GetRequiredService<IUow>();
-        await uow.EnsureCreatedAsync(cancellationToken);
+        var databaseLifecycle = scope.ServiceProvider
+            .GetRequiredService<IDatabaseLifecycle>();
+        await databaseLifecycle.EnsureCreatedAsync(cancellationToken);
+    }
+
+    public static async Task RunDividendHarvestAsync(
+        this WebApplication app,
+        CancellationToken cancellationToken = default)
+    {
+        app.UseDividendHarvest();
+        await app.InitializeDividendHarvestDatabaseAsync(cancellationToken);
+        await app.RunAsync(cancellationToken);
     }
 }
