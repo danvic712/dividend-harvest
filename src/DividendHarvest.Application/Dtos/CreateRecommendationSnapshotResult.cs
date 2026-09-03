@@ -5,4 +5,4 @@ public sealed record CreateRecommendationSnapshotResult(
     Guid PortfolioId,
     int SnapshotCount,
     DateTimeOffset ComputedAt,
-    IReadOnlyList<StockAnalysisResult> Stocks);
+    IReadOnlyList<StockRecommendationResult> Stocks);

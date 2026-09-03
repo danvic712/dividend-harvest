@@ -105,7 +105,6 @@ public sealed class StockAnalysisAppServiceTests
         Assert.Equal(100, result.HeldShares);
         Assert.Equal(60, result.CoreShares);
         Assert.Equal(40, result.SatelliteShares);
-        Assert.Equal(0, result.SuggestedBuyShares);
         Assert.Equal(new DateOnly(2026, 9, 1), result.DataAsOfDate);
         Assert.Equal(parameters.Id, result.ModelParameterSetId);
     }
@@ -155,8 +154,6 @@ public sealed class StockAnalysisAppServiceTests
         Assert.Null(result.ModelDividendPerShare);
         Assert.Null(result.PriceZoneCode);
         Assert.Equal("no_action", result.RecommendationCode);
-        Assert.Equal(0, result.SuggestedBuyShares);
-        Assert.Equal(0, result.SuggestedSellShares);
     }
 
     [Fact]
@@ -245,8 +242,6 @@ public sealed class StockAnalysisAppServiceTests
         Assert.Equal(new DateOnly(2026, 9, 1), result.DataAsOfDate);
         Assert.Equal("strong_buy", result.PriceZoneCode);
         Assert.Equal("strong_buy", result.RecommendationCode);
-        Assert.Equal(200, result.SuggestedBuyShares);
-        Assert.Equal(800m, result.SuggestedTradeAmount);
     }
 
     [Fact]
@@ -337,8 +332,6 @@ public sealed class StockAnalysisAppServiceTests
         Assert.Equal("failed", result.DividendReliabilityCode);
         Assert.Equal("re_evaluate", result.RecommendationCode);
         Assert.Equal("strong_buy", result.PriceZoneCode);
-        Assert.Equal(0, result.SuggestedBuyShares);
-        Assert.Equal(0, result.SuggestedSellShares);
     }
 
     [Fact]

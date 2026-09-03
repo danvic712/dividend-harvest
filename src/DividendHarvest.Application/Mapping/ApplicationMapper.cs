@@ -10,6 +10,7 @@ public static partial class ApplicationMapper
     public static partial StockHoldingSnapshot ToStockHoldingSnapshot(
         PortfolioPosition position);
 
+    [MapProperty(nameof(Security.Id), nameof(StockWatchlistItem.SecurityId))]
     public static partial StockWatchlistItem ToStockWatchlistItem(
         Security security,
         StockHoldingSnapshot? holding);

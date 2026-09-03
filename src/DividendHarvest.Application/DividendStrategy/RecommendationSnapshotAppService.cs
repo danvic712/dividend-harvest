@@ -16,18 +16,13 @@ public sealed class RecommendationSnapshotAppService(
     {
         var recommendation = await portfolioRecommendationAppService.GetAsync(
             cancellationToken);
-        var stocks = await uow.Get<Security>()
-            .ListAsync(cancellationToken: cancellationToken);
-        var securitiesByReference = stocks.ToDictionary(
-            security => (security.SecurityCode, security.ExchangeCode));
         var modelRunId = Guid.NewGuid();
         var snapshots = new List<RecommendationSnapshot>(recommendation.Stocks.Count);
 
-        foreach (var analysis in recommendation.Stocks)
+        foreach (var stock in recommendation.Stocks)
         {
-            if (!securitiesByReference.TryGetValue(
-                    (analysis.SecurityCode, analysis.ExchangeCode),
-                    out var security))
+            var analysis = stock.Analysis;
+            if (analysis.SecurityId == Guid.Empty)
             {
                 throw ApplicationErrors.WithSecurityReference(
                     ApplicationErrorCodes.StockNotConfigured,
@@ -38,7 +33,7 @@ public sealed class RecommendationSnapshotAppService(
             snapshots.Add(RecommendationSnapshot.Create(
                 modelRunId,
                 recommendation.PortfolioId,
-                security.Id,
+                analysis.SecurityId,
                 analysis.DataAsOfDate,
                 analysis.ClosePrice,
                 analysis.ModelDividendPerShare,
@@ -50,10 +45,10 @@ public sealed class RecommendationSnapshotAppService(
                 analysis.PriceZoneConfirmed,
                 analysis.RecommendationCode,
                 analysis.DividendYield,
-                analysis.SuggestedBuyShares,
-                analysis.SuggestedSellShares,
-                analysis.SuggestedTradeAmount,
-                analysis.EstimatedTransactionFeeAmount,
+                stock.SuggestedBuyShares,
+                stock.SuggestedSellShares,
+                stock.SuggestedTradeAmount,
+                stock.EstimatedTransactionFeeAmount,
                 analysis.ComputedAt,
                 analysis.ModelParameterSetId));
         }

@@ -21,11 +21,8 @@ public sealed record StockAnalysisResult(
     int HeldShares,
     int CoreShares,
     int SatelliteShares,
-    int SuggestedBuyShares,
-    int SuggestedSellShares,
-    decimal SuggestedTradeAmount,
-    decimal EstimatedTransactionFeeAmount,
     DateOnly? DataAsOfDate,
     Guid? ModelParameterSetId,
     DateTimeOffset ComputedAt,
-    string Explanation);
+    string Explanation,
+    Guid SecurityId);

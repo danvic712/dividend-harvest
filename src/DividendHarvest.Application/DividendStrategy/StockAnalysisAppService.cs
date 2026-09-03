@@ -6,7 +6,6 @@ using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.DividendModel;
 using DividendHarvest.Domain.Codes;
 using DividendHarvest.Domain.Models;
-using DividendHarvest.Domain.Portfolio;
 using DividendHarvest.Domain.Securities;
 using FluentValidation;
 
@@ -115,51 +114,6 @@ public sealed class StockAnalysisAppService(
             dividendEvents,
             priceObservation.TradingDate);
 
-        var cashEntries = await uow.Get<CashLedgerEntry>()
-            .ListAsync(
-                entry => entry.PortfolioId == parameters.PortfolioId,
-                cancellationToken: cancellationToken);
-        var cashBalanceAmount = PortfolioBudgetCalculator.CalculateCashBalance(cashEntries);
-        var portfolioPositions = await uow.Get<PortfolioPosition>()
-            .ListAsync(
-                currentPosition => currentPosition.PortfolioId == parameters.PortfolioId,
-                cancellationToken: cancellationToken);
-        var portfolioPriceObservations = await uow.Get<PriceObservation>()
-            .ListAsync(
-                observation =>
-                    observation.TradingDate <= currentDate
-                    && observation.DataQualityCode == DataQualityCodes.Valid,
-                cancellationToken: cancellationToken);
-        var latestPrices = portfolioPriceObservations
-            .GroupBy(observation => observation.SecurityId)
-            .ToDictionary(
-                group => group.Key,
-                group => group
-                    .OrderByDescending(observation => observation.TradingDate)
-                    .First());
-        var totalPortfolioValue = portfolioPositions
-            .Where(currentPosition => latestPrices.ContainsKey(currentPosition.SecurityId))
-            .Sum(currentPosition =>
-                currentPosition.HeldShares
-                * latestPrices[currentPosition.SecurityId].ClosePrice);
-        var portfolioValuationComplete = PortfolioBudgetCalculator.HasCompleteMarketValue(
-            portfolioPositions,
-            latestPrices.Keys.ToHashSet());
-        var portfolioParameters = await uow.Get<ModelParameterSet>()
-            .ListAsync(
-                parameter =>
-                    parameter.PortfolioId == parameters.PortfolioId
-                    && parameter.EffectiveFromDate <= currentDate,
-                cancellationToken: cancellationToken);
-        var cashReserveRatio = PortfolioBudgetCalculator.CalculateCurrentCashReserveRatio(
-            portfolioParameters,
-            currentDate);
-        var availableBudgetAmount = portfolioValuationComplete
-            ? PortfolioBudgetCalculator.CalculateAvailableBudget(
-                cashBalanceAmount,
-                totalPortfolioValue,
-                cashReserveRatio)
-            : 0m;
         var modelStatusCode = hasRecentCancellation
             ? ModelStatusCodes.ReEvaluate
             : reliabilityCode switch
@@ -176,26 +130,9 @@ public sealed class StockAnalysisAppService(
             parameters,
             modelDividendPerShare.Value,
             priceObservations);
-        var operationPriceZoneCode =
-            priceZoneConfirmation.ConfirmedPriceZoneCode ?? PriceZoneCodes.Hold;
         var recommendationCode = GetRecommendationCode(
             modelStatusCode,
             priceZoneConfirmation.ConfirmedPriceZoneCode);
-        var tradeQuantity = TradeQuantityCalculator.Calculate(
-            parameters,
-            modelStatusCode,
-            reliabilityCode,
-            operationPriceZoneCode,
-            priceObservation.ClosePrice,
-            heldShares,
-            coreShares,
-            position?.TargetShares ?? 0,
-            availableBudgetAmount,
-            totalPortfolioValue > 0 ? totalPortfolioValue : null,
-            position is null
-                ? 0m
-                : position.HeldShares * priceObservation.ClosePrice,
-            null);
         var explanation = BuildExplanation(
             modelStatusCode,
             priceZoneConfirmation.IsConfirmed,
@@ -222,14 +159,11 @@ public sealed class StockAnalysisAppService(
             heldShares,
             coreShares,
             satelliteShares,
-            tradeQuantity.SuggestedBuyShares,
-            tradeQuantity.SuggestedSellShares,
-            tradeQuantity.SuggestedTradeAmount,
-            tradeQuantity.EstimatedTransactionFeeAmount,
             priceObservation.TradingDate,
             parameters.Id,
             computedAt,
-            explanation);
+            explanation,
+            security.Id);
     }
 
     private static string GetRecommendationCode(
@@ -293,12 +227,9 @@ public sealed class StockAnalysisAppService(
             heldShares,
             coreShares,
             satelliteShares,
-            0,
-            0,
-            0m,
-            0m,
             priceObservation?.TradingDate,
             null,
             computedAt,
-            "缺少有效模型参数、行情或 TTM 实际股息，暂不生成价格区域和交易建议。");
+            "缺少有效模型参数、行情或 TTM 实际股息，暂不生成价格区域和交易建议。",
+            security.Id);
 }

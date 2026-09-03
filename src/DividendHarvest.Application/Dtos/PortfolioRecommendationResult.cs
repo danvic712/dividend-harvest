@@ -6,5 +6,5 @@ public sealed record PortfolioRecommendationResult(
     decimal RemainingAvailableBudgetAmount,
     decimal TotalSuggestedTradeAmount,
     decimal EstimatedTransactionFeeAmount,
-    IReadOnlyList<StockAnalysisResult> Stocks,
+    IReadOnlyList<StockRecommendationResult> Stocks,
     DateTimeOffset ComputedAt);

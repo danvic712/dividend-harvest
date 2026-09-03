@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
@@ -32,14 +31,13 @@ public sealed class RecommendationSnapshotAppServiceTests
             200m,
             800m,
             5m,
-            [analysis],
+            [new StockRecommendationResult(analysis, 200, 0, 800m, 5m)],
             new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
         var portfolioRecommendationAppService =
             new Mock<IPortfolioRecommendationAppService>();
         portfolioRecommendationAppService
             .Setup(x => x.GetAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(portfolioRecommendation);
-        var securityRepository = CreateRepository([security]);
         var snapshotRepository = CreateRepository<RecommendationSnapshot>([]);
         snapshotRepository
             .Setup(x => x.AddAsync(
@@ -47,7 +45,6 @@ public sealed class RecommendationSnapshotAppServiceTests
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var unitOfWork = new Mock<IUow>();
-        unitOfWork.Setup(x => x.Get<Security>()).Returns(securityRepository.Object);
         unitOfWork
             .Setup(x => x.Get<RecommendationSnapshot>())
             .Returns(snapshotRepository.Object);
@@ -67,7 +64,7 @@ public sealed class RecommendationSnapshotAppServiceTests
                 snapshot.ModelRunId == result.ModelRunId
                 && snapshot.PortfolioId == portfolioId
                 && snapshot.SecurityId == security.Id
-                && snapshot.SuggestedBuyShares == analysis.SuggestedBuyShares),
+                && snapshot.SuggestedBuyShares == 200),
             It.IsAny<CancellationToken>()),
             Times.Once);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -86,7 +83,7 @@ public sealed class RecommendationSnapshotAppServiceTests
                 0m,
                 0m,
                 0m,
-                [CreateAnalysis(new Security
+                [new StockRecommendationResult(CreateAnalysis(new Security
                 {
                     Id = Guid.NewGuid(),
                     SecurityCode = "000001",
@@ -94,12 +91,9 @@ public sealed class RecommendationSnapshotAppServiceTests
                     SecurityName = "平安银行",
                     MarketCode = "A-share",
                     CurrencyCode = "CNY"
-                })],
+                }, Guid.Empty), 0, 0, 0m, 0m)],
                 DateTimeOffset.UtcNow));
         var unitOfWork = new Mock<IUow>();
-        unitOfWork
-            .Setup(x => x.Get<Security>())
-            .Returns(CreateRepository<Security>([]).Object);
         var service = new RecommendationSnapshotAppService(
             unitOfWork.Object,
             portfolioRecommendationAppService.Object,
@@ -109,10 +103,13 @@ public sealed class RecommendationSnapshotAppServiceTests
             service.CreateAsync(CancellationToken.None));
 
         unitOfWork.Verify(x => x.Get<RecommendationSnapshot>(), Times.Never);
+        unitOfWork.Verify(x => x.Get<Security>(), Times.Never);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    private static StockAnalysisResult CreateAnalysis(Security security)
+    private static StockAnalysisResult CreateAnalysis(
+        Security security,
+        Guid? securityId = null)
         => new(
             security.SecurityCode,
             security.ExchangeCode,
@@ -134,14 +131,11 @@ public sealed class RecommendationSnapshotAppServiceTests
             0,
             0,
             0,
-            200,
-            0,
-            800m,
-            5m,
             new DateOnly(2026, 9, 1),
             Guid.NewGuid(),
             new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero),
-            "测试结果");
+            "测试结果",
+            securityId ?? security.Id);
 
     private static Mock<IRepository<TEntity>> CreateRepository<TEntity>(
         IEnumerable<TEntity> entities)

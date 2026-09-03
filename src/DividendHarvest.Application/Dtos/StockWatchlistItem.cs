@@ -7,4 +7,7 @@ public sealed record StockWatchlistItem(
     string MarketCode,
     string CurrencyCode,
     StockHoldingSnapshot? Holding,
-    string? SectorCode = null);
+    string? SectorCode = null)
+{
+    public Guid SecurityId { get; init; }
+}

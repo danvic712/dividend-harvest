@@ -25,6 +25,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IStockFactSyncAppService, StockFactSyncAppService>();
         services.AddScoped<IStockAnalysisAppService, StockAnalysisAppService>();
         services.AddScoped<IPortfolioAllocationAppService, PortfolioAllocationAppService>();
+        services.AddScoped<IStockRecommendationAppService, StockRecommendationAppService>();
         services.AddScoped<IBudgetAppService, BudgetAppService>();
         services.AddScoped<IPortfolioRecommendationAppService, PortfolioRecommendationAppService>();
         services.AddScoped<IRecommendationSnapshotAppService, RecommendationSnapshotAppService>();

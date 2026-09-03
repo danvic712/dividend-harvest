@@ -90,10 +90,13 @@ src/
 │   │   ├── IStockModelParameterAppService.cs
 │   │   ├── IStockPriceObservationAppService.cs
 │   │   ├── IStockDividendEventAppService.cs
+│   │   ├── IStockFactSyncAppService.cs
 │   │   ├── IStockAnalysisAppService.cs
+│   │   ├── IStockRecommendationAppService.cs
 │   │   ├── IStockFinancialSnapshotAppService.cs
 │   │   ├── IBudgetAppService.cs
 │   │   ├── IPortfolioRecommendationAppService.cs
+│   │   ├── IPortfolioAllocationAppService.cs
 │   │   ├── IRecommendationSnapshotAppService.cs
 │   │   └── IStockDailyDataSyncAppService.cs
 │   ├── Dtos/                           # 所有 Application DTO
@@ -105,6 +108,7 @@ src/
 │   ├── Setup/                          # AppService 实现和用例编排
 │   ├── Stocks/                         # 股票资料、关注列表和交易日数据同步
 │   │   ├── StockWatchlistAppService.cs
+│   │   ├── StockFactSyncAppService.cs
 │   │   ├── StockPriceObservationAppService.cs
 │   │   ├── StockDividendEventAppService.cs
 │   │   ├── StockFinancialSnapshotAppService.cs
@@ -116,6 +120,8 @@ src/
 │   └── DividendStrategy/               # 模型参数、单股分析和组合建议
 │       ├── StockModelParameterAppService.cs
 │       ├── StockAnalysisAppService.cs
+│       ├── StockRecommendationAppService.cs
+│       ├── PortfolioAllocationAppService.cs
 │       ├── PortfolioRecommendationAppService.cs
 │       └── RecommendationSnapshotAppService.cs
 ├── DividendHarvest.Infrastructure/
@@ -153,9 +159,9 @@ src/
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
 ```
 
-Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 Interface：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和异常语义；单股分析与组合建议也保持独立。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。
+Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 HTTP 契约：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和结果类型；三类事实的共同摄取、Security 解析、FTShare 调用、幂等写入和逐类失败策略由 `IStockFactSyncAppService` / `StockFactSyncAppService` 这个深模块承载，三个 HTTP AppService 只是验证后转发。单股分析、组合分配和建议快照也保持独立的用例边界。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。
 
-`Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
+`Stocks` 同时承载交易日同步编排，因为该编排只围绕关注股票的外部事实更新；交易日同步通过 `IStockFactSyncAppService.SyncAsync` 一次传递单只股票的规范化引用，并消费包含三类结果和逐类失败的 `StockFactSyncResult`。如果未来出现多个互不相关的调度任务，再单独引入 `Operations` 模块。`StockModelParameterAppService` 归入 `DividendStrategy`，因为模型参数是分析和组合建议的输入，而不是持仓或现金流水本身。
 
 各层的依赖注入通过对应的扩展类集中注册：Application 使用 `ApplicationServiceCollectionExtensions.AddDividendHarvestApplication`，Infrastructure 使用 `InfrastructureServiceCollectionExtensions.AddDividendHarvestInfrastructure`，Host 使用 `HostServiceCollectionExtensions.AddDividendHarvestHost`。Host 对 `WebApplication` 的异常处理中间件、Controller/健康检查路由和数据库初始化统一放在 `WebApplicationExtensions`；`Program.cs` 只保留配置构建、扩展调用、应用构建和启动顺序。
 
@@ -394,21 +400,42 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 ### 8.8 当前股票分析
 
-`GET /api/v1/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockAnalysisAppService` 读取当前已生效模型参数、按交易日期去重后的最近两个有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界。`ObservedPriceZoneCode` 是最新有效收盘价的直接区域，`PriceZoneCode` 只有在最近两个有效交易日一致时才有值；未确认时不生成买入或减仓股数。历史回放中的股息和财务事实还必须满足 `published_at` 不晚于 `data_as_of_date`；缺失公开时间的事实仍可参与当前 V1 计算，但不应被伪造为有明确公开时点。
+`GET /api/v1/stocks/{securityCode}/{exchangeCode}/analysis` 通过 `IStockRecommendationAppService` 编排单股结果：`IStockAnalysisAppService` 读取当前已生效模型参数、按交易日期去重后的最近两个有效行情、股息事实和可选持仓，计算 TTM 实际每股股息、当前股息率及四个参考价格边界；随后由单股推荐用例调用 `IPortfolioAllocationAppService` 在单股票范围内计算建议股数。`StockAnalysisResult` 只承载可复用的单股分析事实，`StockRecommendationResult` 在外层承载建议买卖股数、金额和预计手续费，避免把组合分配结果混入分析 DTO。`ObservedPriceZoneCode` 是最新有效收盘价的直接区域，`PriceZoneCode` 只有在最近两个有效交易日一致时才有值；未确认时不生成买入或减仓股数。历史回放中的股息和财务事实还必须满足 `published_at` 不晚于 `data_as_of_date`；缺失公开时间的事实仍可参与当前 V1 计算，但不应被伪造为有明确公开时点。
 
-分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；取消分红时可靠性代码为 `failed`，模型状态单独为 `re_evaluate`，建议代码为 `re_evaluate`。当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。可靠性通过后，Application 使用现金流水净余额、现金保留比例、组合中已有持仓市值、模型参数中的预算/仓位上限、目标股数、核心仓和交易单位调用 Domain `TradeQuantityCalculator`，返回建议买入/卖出股数和估算交易金额。多股票之间的资金排序和集中度竞争由组合建议用例统一处理，建议快照由独立用例保存。
+分析结果明确区分 `unavailable`、`cautious`、`failed`、`re_evaluate` 和价格区域；取消分红时可靠性代码为 `failed`，模型状态单独为 `re_evaluate`，建议代码为 `re_evaluate`。当前没有完整股息可靠性财务资料时只返回谨慎参考和 `no_action`，不生成买卖股数。单股分析阶段不读取组合现金或全组合市值，也不计算交易数量；`StockRecommendationAppService` 或组合分配阶段统一调用 Domain `TradeQuantityCalculator`，避免同一结果在两个阶段重复计算。`StockAnalysisResult.SecurityId` 是后续 Application 阶段传递的规范本地身份。多股票之间的资金排序和集中度竞争由组合建议用例统一处理，建议快照由独立用例保存。
 
 ### 8.9 多股票组合建议
 
-`GET /api/v1/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的分析结果、有效模型参数和组合预算，在组合层统一分配本期可用资金。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
+`GET /api/v1/recommendations` 通过 `IPortfolioRecommendationAppService` 读取关注列表、每只股票的单股分析结果和组合预算，再把这些已按股票代码与交易所对齐的输入交给 `IPortfolioAllocationAppService`。前者是组合建议用例编排，后者是组合分配深模块，并在组合范围读取有效模型参数，独立负责本期预算、行业/单股约束、交易数量和稳定排序。资金分配顺序固定为强买入区、分批加仓区，再按可靠性通过状态和目标股数缺口排序；相同条件保持关注列表的稳定顺序，不使用随机排序。
 
 组合建议会先从现金流水余额扣除组合现金保留比例，再逐只应用预算比例、单股/单次/单期金额上限、行业/单股/单期金额上限、交易单位和手续费，并把已分配的买入金额从剩余预算中扣除。现金保留比例虽然按股票参数保存，但组合计算取当前有效参数中的最大值。减仓仍保护核心仓，不占用买入预算。`Security.SectorCode` 来自 FTShare 股票资料的可选 `sector_code`/`industry_code` 字段；缺失行业资料时跳过行业上限，不推断或伪造行业归属。
 
-`POST /api/v1/recommendations/snapshots` 使用同一份组合建议生成唯一 `model_run_id`，在一个 UoW 提交中保存每只股票的 `RecommendationSnapshot`。快照保留原始数据日期、参数版本、状态、价格区域和建议数量，不覆盖行情、股息、财务或现金流水事实，便于复现和后续回放。
+`POST /api/v1/recommendations/snapshots` 使用同一份组合建议生成唯一 `model_run_id`，在一个 UoW 提交中保存每只股票的 `RecommendationSnapshot`。`StockAnalysisResult` 携带由单股分析阶段解析出的本地 `SecurityId`，快照用例直接使用该规范身份，不按代码再次查询或重建股票关系。快照保留原始数据日期、参数版本、状态、价格区域和建议数量，不覆盖行情、股息、财务或现金流水事实，便于复现和后续回放。
 
 ### 8.10 交易日数据同步
 
-`IStockDailyDataSyncAppService` 按关注列表逐只编排行情、股息和财务快照同步；失败项记录股票、数据类型、稳定 `error_code` 和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计三类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
+`IStockDailyDataSyncAppService` 按关注列表逐只调用 `IStockFactSyncAppService`；事实同步模块按股票复用一次 Security 上下文，分别执行行情、股息和财务快照同步。失败项记录股票、数据类型、稳定 `error_code` 和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计三类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
+
+股票事实与建议的 Application 数据流如下：
+
+```text
+StockDailyDataSyncAppService ──┐
+                               ▼
+                     StockFactSyncAppService
+                               ├── Security 上下文
+                               ├── FTShare market/dividend/financial
+                               └── 三类事实幂等写入
+
+StockAnalysisAppService ──> StockAnalysisResult(+ SecurityId)
+                                      │
+StockRecommendationAppService ───────┴──> StockRecommendationResult
+                                      │
+PortfolioRecommendationAppService ────┴──> PortfolioAllocationAppService
+                                                        │
+                                                        ▼
+                                      RecommendationSnapshotAppService
+                                      (直接使用同一分析结果写入快照)
+```
 
 Host 的 `DailyStockDataSyncHostedService` 按 `DailySync:LocalTime` 和 `DailySync:TimeZoneId` 调度，默认使用上海时间每日 18:00，并跳过周末；A 股法定节假日由数据源实际返回结果决定，重复快照通过事实同步用例幂等处理。生产环境可以通过 `DailySync:Enabled=false` 关闭后台调度而保留手动接口。
 
