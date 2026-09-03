@@ -3,7 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace DividendHarvest.HealthChecks;
 
-public sealed class DatabaseHealthCheck(IDatabaseLifecycle databaseLifecycle) : IHealthCheck
+public sealed class DatabaseHealthCheck(IServiceScopeFactory serviceScopeFactory) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -11,6 +11,9 @@ public sealed class DatabaseHealthCheck(IDatabaseLifecycle databaseLifecycle) : 
     {
         try
         {
+            await using var scope = serviceScopeFactory.CreateAsyncScope();
+            var databaseLifecycle = scope.ServiceProvider
+                .GetRequiredService<IDatabaseLifecycle>();
             return await databaseLifecycle.CanConnectAsync(cancellationToken)
                 ? HealthCheckResult.Healthy()
                 : HealthCheckResult.Unhealthy("数据库不可用。");
