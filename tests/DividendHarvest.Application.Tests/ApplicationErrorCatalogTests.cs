@@ -8,11 +8,17 @@ namespace DividendHarvest.Application.Tests;
 public sealed class ApplicationErrorCatalogTests
 {
     private readonly IApplicationErrorCatalog catalog = new ApplicationErrorCatalog();
+    private readonly IApplicationErrorLocalizer localizer;
+
+    public ApplicationErrorCatalogTests()
+    {
+        localizer = new ApplicationErrorLocalizer(catalog);
+    }
 
     [Fact]
     public void Resolve_loads_embedded_zh_cn_error_definitions()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.Simple(ApplicationErrorCodes.SetupAlreadyCompleted),
             "zh-CN");
 
@@ -27,7 +33,7 @@ public sealed class ApplicationErrorCatalogTests
     [Fact]
     public void Resolve_supports_another_embedded_locale()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.Simple(ApplicationErrorCodes.SetupAlreadyCompleted),
             "en-US");
 
@@ -40,7 +46,7 @@ public sealed class ApplicationErrorCatalogTests
     [Fact]
     public void Resolve_uses_the_highest_quality_supported_language()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.Simple(ApplicationErrorCodes.SetupAlreadyCompleted),
             "zh-CN;q=0.1,en-US;q=0.9");
 
@@ -50,7 +56,7 @@ public sealed class ApplicationErrorCatalogTests
     [Fact]
     public void Resolve_returns_the_canonical_culture_name()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.Simple(ApplicationErrorCodes.SetupAlreadyCompleted),
             "en-us");
 
@@ -60,7 +66,7 @@ public sealed class ApplicationErrorCatalogTests
     [Fact]
     public void Resolve_does_not_mix_chinese_validation_text_into_english_response()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.Validation(
                 ApplicationErrorCodes.SetupValidationFailed,
                 "投资组合名称必须为 1 到 100 个字符。"),
@@ -73,7 +79,7 @@ public sealed class ApplicationErrorCatalogTests
     [Fact]
     public void Resolve_uses_default_locale_for_an_unsupported_accept_language()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted),
             "fr-FR,fr;q=0.9");
 
@@ -84,7 +90,7 @@ public sealed class ApplicationErrorCatalogTests
     [Fact]
     public void Resolve_interpolates_exception_parameters_without_exposing_inner_errors()
     {
-        var localized = catalog.Resolve(
+        var localized = localizer.Localize(
             ApplicationErrors.WithModelParameterVersion(
                 ApplicationErrorCodes.ModelParameterVersionAlreadyExists,
                 "000001",
@@ -132,7 +138,7 @@ public sealed class ApplicationErrorCatalogTests
         {
             foreach (var exception in exceptions)
             {
-                var localized = catalog.Resolve(exception, cultureName);
+                var localized = localizer.Localize(exception, cultureName);
 
                 Assert.Equal(exception.ErrorCode, localized.ErrorCode);
                 Assert.NotEmpty(localized.Title);

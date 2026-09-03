@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace DividendHarvest.Application.Localization;
 
-internal sealed class ApplicationErrorDefinition
+public sealed class ApplicationErrorDefinition
 {
     [JsonPropertyName("status_code")]
     public int StatusCode { get; init; }

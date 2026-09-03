@@ -1,7 +1,6 @@
 using System.Linq.Expressions;
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
-using DividendHarvest.Application.Localization;
 using DividendHarvest.Application.Stocks;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -54,8 +53,7 @@ public sealed class StockFactSyncAppServiceTests
             .ReturnsAsync(Array.Empty<StockFinancialData>());
         var service = new StockFactSyncAppService(
             unitOfWork.Object,
-            provider.Object,
-            new ApplicationErrorCatalog());
+            provider.Object);
 
         var result = await service.SyncAsync(
             AShareReference.Create("000001", "SZSE"),
@@ -64,6 +62,7 @@ public sealed class StockFactSyncAppServiceTests
         var failure = Assert.Single(result.Failures);
         Assert.Equal("price", failure.DataKind);
         Assert.Equal("stock_market_data_unavailable", failure.ErrorCode);
+        Assert.Equal("000001", failure.Parameters["securityCode"]);
         Assert.Empty(result.DividendEvents);
         Assert.Empty(result.FinancialSnapshots);
         securityRepository.Verify(x => x.SingleOrDefaultAsync(

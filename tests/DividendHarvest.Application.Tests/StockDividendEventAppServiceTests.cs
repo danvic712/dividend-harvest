@@ -112,8 +112,7 @@ public sealed class StockDividendEventAppServiceTests
         => new(
             new StockFactSyncAppService(
                 unitOfWork,
-                provider,
-                new ApplicationErrorCatalog()),
+                provider),
             new SyncStockDividendsRequestValidator());
 
     private static StockDividendData CreateDividendData(

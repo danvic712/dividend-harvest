@@ -40,7 +40,7 @@ ASP.NET Core 默认环境名为 `Production`（大小写不敏感）时，会自
 
 ## 3.1 多语言资源
 
-根目录 `locales/` 是跨层共享的文本资源源文件，当前包含 `zh-CN` 和 `en-US` 两个语言目录；每个语言目录按业务领域拆分为 `common.json`、`setup.json`、`stocks.json`、`portfolio.json` 和 `dividend-strategy.json`。异常定义使用稳定的 `error_code` 作为 JSON 键，并支持由 Application 异常提供的命名参数插值。
+根目录 `locales/` 是跨层共享的文本资源源文件，当前包含 `zh-CN` 和 `en-US` 两个语言目录；每个语言目录按业务领域拆分为 `common.json`、`setup.json`、`stocks.json`、`portfolio.json` 和 `dividend-strategy.json`。异常定义使用稳定的 `error_code` 作为 JSON 键，并支持由 Application 异常提供的命名参数插值。错误目录只负责错误定义和文本资源，语言选择、参数插值与 HTTP 展示由独立的 `IApplicationErrorLocalizer` 负责。
 
 Application 项目通过 `EmbeddedResource` 将根目录 `locales/**/*.json` 编译嵌入 `DividendHarvest.Application.dll`。运行时只从程序集资源读取文本，不读取可被容器或请求任意替换的本地文件。Host 的统一异常处理器根据请求的 `Accept-Language` 及其 `q` 权重选择语言，返回 canonical culture name；不支持、质量为 0 或缺失时回退到 `zh-CN`，并在 ProblemDetails 扩展中返回实际使用的 `locale`。后台同步等非 HTTP 入口使用默认语言。
 
@@ -290,9 +290,9 @@ SetupAppService
 - `EFUow.CommitAsync` 统一调用 `SaveChangesAsync`；数据库更新失败在 Infrastructure 转换为 Domain 的 `UnitOfWorkCommitException`，并只标记可识别的 SQLite 唯一约束失败；Application 不引用 `DbUpdateException`。
 - 一个用例的多个实体写入在一次提交中完成；Repository 不提前提交，也不把可延迟执行的查询对象交给调用方。
 - `DividendHarvestDbContext` 位于 Infrastructure 根目录；`EFRepository<TEntity>` 和 `EFUow` 位于 `Infrastructure/Repositories/`，均为 Infrastructure 内部实现，避免 Host/Application 绕过 `IUow` 直接访问 DbContext。
-- Host 的 `/healthz`、`/readyz` 使用 ASP.NET Core 原生 Health Checks；数据库健康检查通过 `IUow.CanConnectAsync` 实现。健康检查是运行状态入口，不属于业务 API 版本范围。
-- Host 的启动建库只能通过 `IUow.EnsureCreatedAsync`，不直接解析 DbContext。
-- `EFUow.EnsureCreatedAsync` 在 SQLite 启动时执行幂等的兼容升级，为既有 `/app/data` 数据库补齐新增字段、默认值和现金流水幂等唯一索引；未来新增表结构必须沿用可回放的迁移/升级步骤，不能只修改 Fluent Configuration。
+- Host 的 `/healthz`、`/readyz` 使用 ASP.NET Core 原生 Health Checks；数据库健康检查通过 Infrastructure 的 `IDatabaseLifecycle.CanConnectAsync` 实现。健康检查是运行状态入口，不属于业务 API 版本范围。
+- Host 的启动建库只能通过 Infrastructure 的 `IDatabaseLifecycle.EnsureCreatedAsync`，不直接解析 DbContext，也不让 `IUow` 承担数据库生命周期职责。
+- `DatabaseLifecycle.EnsureCreatedAsync` 在 SQLite 启动时执行幂等的兼容升级，为既有 `/app/data` 数据库补齐新增字段、默认值和现金流水幂等唯一索引；未来新增表结构必须沿用可回放的迁移/升级步骤，不能只修改 Fluent Configuration。
 - 数据库通过 Docker volume 持久化到 `/app/data`；镜像本身不保存用户数据。
 
 ## 7. Domain Models 与 Fluent 配置
@@ -414,7 +414,7 @@ Application 只返回 `StockModelParameterSet` DTO，不返回 `ModelParameterSe
 
 ### 8.10 交易日数据同步
 
-`IStockDailyDataSyncAppService` 按关注列表逐只调用 `IStockFactSyncAppService`；事实同步模块按股票复用一次 Security 上下文，分别执行行情、股息和财务快照同步。失败项记录股票、数据类型、稳定 `error_code` 和可读原因，其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计三类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
+`IStockDailyDataSyncAppService` 按关注列表逐只调用 `IStockFactSyncAppService`；事实同步模块按股票复用一次 Security 上下文，分别执行行情、股息和财务快照同步。失败项记录股票、数据类型、稳定 `error_code` 和结构化 `parameters`，不在后台结果中固化某一种语言的展示文案；HTTP 入口由 `IApplicationErrorLocalizer` 按 `Accept-Language` 生成文本，后台日志和其他非 HTTP 消费者使用默认语言在展示边界本地化。其他数据类型及其他股票继续执行，避免单个 FTShare 数据缺口阻断整批更新。结果中的 `FullyCompletedStockCount` 只统计三类数据全部成功的股票，`PartiallyFailedStockCount` 统计至少一类失败的股票。`POST /api/v1/stocks/sync` 提供手动触发入口。
 
 股票事实与建议的 Application 数据流如下：
 

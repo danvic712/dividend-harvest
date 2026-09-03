@@ -7,7 +7,7 @@ using DividendHarvest.Contracts;
 namespace DividendHarvest.ExceptionHandling;
 
 public sealed class ApplicationExceptionHandler(
-    IApplicationErrorCatalog errorCatalog,
+    IApplicationErrorLocalizer errorLocalizer,
     IDiagnosticContext diagnosticContext,
     IHttpErrorRenderer errorRenderer,
     ILogger<ApplicationExceptionHandler> logger) : IExceptionHandler
@@ -22,7 +22,7 @@ public sealed class ApplicationExceptionHandler(
             return false;
         }
 
-        var localizedError = errorCatalog.Resolve(
+        var localizedError = errorLocalizer.Localize(
             applicationException,
             httpContext.Request.Headers.AcceptLanguage.ToString());
 

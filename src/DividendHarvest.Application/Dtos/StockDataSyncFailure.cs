@@ -5,4 +5,4 @@ public sealed record StockDataSyncFailure(
     string ExchangeCode,
     string DataKind,
     string ErrorCode,
-    string FailureMessage);
+    IReadOnlyDictionary<string, object?> Parameters);

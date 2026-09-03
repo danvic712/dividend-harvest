@@ -32,6 +32,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IPortfolioTradeAppService, PortfolioTradeAppService>();
         services.AddScoped<IStockDailyDataSyncAppService, StockDailyDataSyncAppService>();
         services.AddSingleton<IApplicationErrorCatalog, ApplicationErrorCatalog>();
+        services.AddSingleton<IApplicationErrorLocalizer, ApplicationErrorLocalizer>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

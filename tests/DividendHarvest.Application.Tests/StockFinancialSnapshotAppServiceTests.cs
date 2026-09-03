@@ -113,8 +113,7 @@ public sealed class StockFinancialSnapshotAppServiceTests
         => new(
             new StockFactSyncAppService(
                 unitOfWork,
-                provider,
-                new ApplicationErrorCatalog()),
+                provider),
             new SyncStockFinancialsRequestValidator());
 
     private static Security CreateSecurity()

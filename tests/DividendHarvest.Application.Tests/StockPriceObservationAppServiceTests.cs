@@ -153,8 +153,7 @@ public sealed class StockPriceObservationAppServiceTests
         => new(
             new StockFactSyncAppService(
                 unitOfWork,
-                provider,
-                new ApplicationErrorCatalog()),
+                provider),
             new SyncStockPriceRequestValidator());
 
     private static Security CreateSecurity()

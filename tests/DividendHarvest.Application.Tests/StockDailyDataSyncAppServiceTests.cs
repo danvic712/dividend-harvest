@@ -114,7 +114,10 @@ public sealed class StockDailyDataSyncAppServiceTests
                         reference.ExchangeCode,
                         "price",
                         ApplicationErrorCodes.StockMarketDataUnavailable,
-                        "行情数据暂不可用。" )]));
+                        new Dictionary<string, object?>
+                        {
+                            ["securityCode"] = reference.SecurityCode
+                        })]));
         var service = CreateService(
             watchlist.Object,
             factSync.Object);
@@ -127,7 +130,7 @@ public sealed class StockDailyDataSyncAppServiceTests
         var failure = Assert.Single(result.Failures);
         Assert.Equal("price", failure.DataKind);
         Assert.Equal("stock_market_data_unavailable", failure.ErrorCode);
-        Assert.Contains("行情数据", failure.FailureMessage);
+        Assert.Equal("000001", failure.Parameters["securityCode"]);
         factSync.Verify(x => x.SyncAsync(
             It.IsAny<AShareReference>(),
             It.IsAny<CancellationToken>()), Times.Once);

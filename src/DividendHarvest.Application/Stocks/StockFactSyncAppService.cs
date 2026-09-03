@@ -1,7 +1,6 @@
 using DividendHarvest.Application.Contracts;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
-using DividendHarvest.Application.Localization;
 using DividendHarvest.Application.Mapping;
 using DividendHarvest.Domain.Contracts;
 using DividendHarvest.Domain.Models;
@@ -11,8 +10,7 @@ namespace DividendHarvest.Application.Stocks;
 
 public sealed class StockFactSyncAppService(
     IUow uow,
-    IStockDataProvider stockDataProvider,
-    IApplicationErrorCatalog applicationErrorCatalog) : IStockFactSyncAppService
+    IStockDataProvider stockDataProvider) : IStockFactSyncAppService
 {
     private static readonly string[] DataKinds = ["price", "dividend", "financial"];
 
@@ -430,13 +428,12 @@ public sealed class StockFactSyncAppService(
         string dataKind,
         ApplicationExceptionBase exception)
     {
-        var localizedError = applicationErrorCatalog.Resolve(exception);
         return new StockDataSyncFailure(
             reference.SecurityCode,
             reference.ExchangeCode,
             dataKind,
             exception.ErrorCode,
-            localizedError.Detail);
+            exception.Parameters);
     }
 
     private static bool IsExpectedSyncFailure(Exception exception)

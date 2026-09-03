@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using DividendHarvest.Application.Contracts;
@@ -28,143 +27,21 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
     public IReadOnlyCollection<string> SupportedCultureNames
         => definitions.Keys.Order(StringComparer.Ordinal).ToArray();
 
-    public LocalizedApplicationError Resolve(
-        ApplicationExceptionBase exception,
-        string? acceptLanguage = null)
+    public ApplicationErrorDefinition GetDefinition(
+        string cultureName,
+        string errorCode)
     {
-        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cultureName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
 
-        var cultureName = SelectCulture(acceptLanguage);
-        var cultureDefinitions = definitions[cultureName];
-        if (!cultureDefinitions.TryGetValue(exception.ErrorCode, out var definition))
+        if (!definitions.TryGetValue(cultureName, out var cultureDefinitions)
+            || !cultureDefinitions.TryGetValue(errorCode, out var definition))
         {
             throw new InvalidOperationException(
-                $"Application error code '{exception.ErrorCode}' is not defined in locale '{cultureName}'.");
+                $"Application error code '{errorCode}' is not defined in locale '{cultureName}'.");
         }
 
-        return new LocalizedApplicationError(
-            exception.ErrorCode,
-            cultureName,
-            definition.StatusCode,
-            definition.Title,
-            Interpolate(
-                definition.Detail,
-                GetInterpolationParameters(exception, definition),
-                cultureName));
-    }
-
-    private string SelectCulture(string? acceptLanguage)
-    {
-        if (!string.IsNullOrWhiteSpace(acceptLanguage))
-        {
-            var preferences = acceptLanguage
-                .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select((language, index) => ParseLanguagePreference(language, index))
-                .Where(preference => preference.Quality > 0)
-                .OrderByDescending(preference => preference.Quality)
-                .ThenBy(preference => preference.Index);
-
-            foreach (var preference in preferences)
-            {
-                var languageName = preference.LanguageName;
-                if (languageName == "*")
-                {
-                    continue;
-                }
-
-                var exactCulture = definitions.Keys.FirstOrDefault(
-                    cultureName => string.Equals(
-                        cultureName,
-                        languageName,
-                        StringComparison.OrdinalIgnoreCase));
-                if (exactCulture is not null)
-                {
-                    return exactCulture;
-                }
-
-                var neutralLanguage = languageName.Split('-', 2)[0];
-                var matchingCulture = definitions.Keys.FirstOrDefault(
-                    cultureName => cultureName.StartsWith(
-                        neutralLanguage + "-",
-                        StringComparison.OrdinalIgnoreCase));
-                if (matchingCulture is not null)
-                {
-                    return matchingCulture;
-                }
-            }
-        }
-
-        return DefaultCultureName;
-    }
-
-    private static (string LanguageName, double Quality, int Index) ParseLanguagePreference(
-        string language,
-        int index)
-    {
-        var segments = language.Split(';', StringSplitOptions.RemoveEmptyEntries);
-        var languageName = segments[0].Trim();
-        var quality = 1d;
-        var qualityParameter = segments
-            .Skip(1)
-            .Select(segment => segment.Trim())
-            .FirstOrDefault(segment => segment.StartsWith("q=", StringComparison.OrdinalIgnoreCase));
-
-        if (qualityParameter is not null
-            && (!double.TryParse(
-                qualityParameter[2..],
-                NumberStyles.AllowDecimalPoint,
-                CultureInfo.InvariantCulture,
-                out quality)
-                || quality is < 0 or > 1))
-        {
-            quality = 0;
-        }
-
-        return (languageName, quality, index);
-    }
-
-    private static string Interpolate(
-        string template,
-        IReadOnlyDictionary<string, object?> parameters,
-        string cultureName)
-    {
-        var result = template;
-        var culture = CultureInfo.GetCultureInfo(cultureName);
-
-        foreach (var parameter in parameters)
-        {
-            var value = parameter.Value switch
-            {
-                null => string.Empty,
-                DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                IFormattable formattable => formattable.ToString(null, culture),
-                _ => parameter.Value.ToString() ?? string.Empty
-            };
-            result = result.Replace(
-                "{" + parameter.Key + "}",
-                value,
-                StringComparison.Ordinal);
-        }
-
-        return result;
-    }
-
-    private static IReadOnlyDictionary<string, object?> GetInterpolationParameters(
-        ApplicationExceptionBase exception,
-        ApplicationErrorDefinition definition)
-    {
-        if (exception is not ApplicationValidationException
-            || string.IsNullOrWhiteSpace(definition.ValidationMessage))
-        {
-            return exception.Parameters;
-        }
-
-        var parameters = exception.Parameters.ToDictionary(
-            parameter => parameter.Key,
-            parameter => parameter.Value,
-            StringComparer.Ordinal);
-        parameters["message"] = definition.ValidationMessage;
-        return parameters;
+        return definition;
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, ApplicationErrorDefinition>> LoadDefinitions(

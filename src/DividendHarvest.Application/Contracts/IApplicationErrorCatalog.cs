@@ -9,7 +9,7 @@ public interface IApplicationErrorCatalog
 
     IReadOnlyCollection<string> SupportedCultureNames { get; }
 
-    LocalizedApplicationError Resolve(
-        ApplicationExceptionBase exception,
-        string? acceptLanguage = null);
+    ApplicationErrorDefinition GetDefinition(
+        string cultureName,
+        string errorCode);
 }
