@@ -1,28 +1,17 @@
-using System.Reflection;
-
 namespace DividendHarvest.Application.Exceptions;
 
 public abstract class ApplicationExceptionBase : Exception
 {
     protected ApplicationExceptionBase(
-        Exception? innerException = null)
-        : this(new Dictionary<string, object?>(), innerException)
-    {
-    }
-
-    protected ApplicationExceptionBase(
+        string errorCode,
         IReadOnlyDictionary<string, object?> parameters,
         Exception? innerException = null)
-        : base(null, innerException)
+        : base(errorCode, innerException)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
         ArgumentNullException.ThrowIfNull(parameters);
 
-        var errorCodeAttribute = GetType().GetCustomAttribute<ApplicationErrorCodeAttribute>()
-            ?? throw new InvalidOperationException(
-                $"Application exception '{GetType().FullName}' must declare {nameof(ApplicationErrorCodeAttribute)}.");
-        ArgumentException.ThrowIfNullOrWhiteSpace(errorCodeAttribute.ErrorCode);
-
-        ErrorCode = errorCodeAttribute.ErrorCode;
+        ErrorCode = errorCode;
         Parameters = parameters.ToDictionary(
             parameter => parameter.Key,
             parameter => parameter.Value,

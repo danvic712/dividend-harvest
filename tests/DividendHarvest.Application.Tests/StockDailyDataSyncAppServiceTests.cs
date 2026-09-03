@@ -120,7 +120,9 @@ public sealed class StockDailyDataSyncAppServiceTests
             .Setup(x => x.SyncAsync(
                 It.IsAny<SyncStockPriceRequest>(),
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new StockMarketDataUnavailableException("000001"));
+            .ThrowsAsync(ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockMarketDataUnavailable,
+                "000001"));
         var dividends = new Mock<IStockDividendEventAppService>();
         dividends
             .Setup(x => x.SyncAsync(

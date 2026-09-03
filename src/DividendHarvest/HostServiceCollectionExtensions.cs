@@ -2,6 +2,8 @@ using DividendHarvest.Background;
 using DividendHarvest.Configuration;
 using DividendHarvest.ExceptionHandling;
 using DividendHarvest.HealthChecks;
+using DividendHarvest.Contracts;
+using DividendHarvest.Diagnostics;
 using Asp.Versioning;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +11,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using ApplicationDiagnosticContext = DividendHarvest.Application.Contracts.IDiagnosticContext;
 
 namespace DividendHarvest;
 
@@ -24,6 +27,8 @@ public static class HostServiceCollectionExtensions
                 .ReadFrom.Services(serviceProvider)
                 .Enrich.FromLogContext());
         services.AddProblemDetails();
+        services.AddSingleton<ApplicationDiagnosticContext, SerilogDiagnosticContext>();
+        services.AddSingleton<IHttpErrorRenderer, ProblemDetailsErrorRenderer>();
         services.AddExceptionHandler<ApplicationExceptionHandler>();
         services.AddControllers();
         services.AddEndpointsApiExplorer();

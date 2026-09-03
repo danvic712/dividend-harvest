@@ -101,9 +101,8 @@ public sealed class StockDailyDataSyncAppService(
     }
 
     private static bool IsExpectedSyncFailure(Exception exception)
-        => exception is StockMarketDataUnavailableException
-            or StockDividendDataUnavailableException
-            or StockFinancialDataUnavailableException
-            or StockDataSyncValidationException
-            or StockNotConfiguredException;
+        => exception is ApplicationExceptionBase applicationException
+            && ApplicationErrorCodes.ExpectedStockSyncFailures.Contains(
+                applicationException.ErrorCode,
+                StringComparer.Ordinal);
 }

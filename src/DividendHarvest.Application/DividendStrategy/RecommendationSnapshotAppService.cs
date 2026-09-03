@@ -31,7 +31,8 @@ public sealed class RecommendationSnapshotAppService(
                     (analysis.SecurityCode, analysis.ExchangeCode),
                     out var security))
             {
-                throw new StockNotConfiguredException(
+                throw ApplicationErrors.WithSecurityReference(
+                    ApplicationErrorCodes.StockNotConfigured,
                     analysis.SecurityCode,
                     analysis.ExchangeCode);
             }

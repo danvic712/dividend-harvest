@@ -64,7 +64,7 @@ public sealed class StockModelParameterAppServiceTests
             CreateRepository<ModelParameterSet>([]));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<StockNotConfiguredException>(() => service.SaveAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.SaveAsync(
             CreateRequest(),
             CancellationToken.None));
 
@@ -81,7 +81,7 @@ public sealed class StockModelParameterAppServiceTests
             StrongBuyBudgetRatio = 1.01m
         };
 
-        await Assert.ThrowsAsync<ModelParameterValidationException>(() =>
+        await Assert.ThrowsAsync<ApplicationValidationException>(() =>
             service.SaveAsync(invalidRequest, CancellationToken.None));
 
         unitOfWork.Verify(x => x.Get<Security>(), Times.Never);
@@ -101,7 +101,7 @@ public sealed class StockModelParameterAppServiceTests
             parameterRepository);
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<ModelParameterVersionAlreadyExistsException>(() =>
+        await Assert.ThrowsAsync<ApplicationErrorException>(() =>
             service.SaveAsync(CreateRequest(), CancellationToken.None));
 
         parameterRepository.Verify(x => x.AddAsync(

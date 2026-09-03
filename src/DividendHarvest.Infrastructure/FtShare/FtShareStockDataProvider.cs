@@ -1,18 +1,21 @@
 using System.Globalization;
 using System.Text.Json;
 using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Diagnostics;
 using DividendHarvest.Application.Dtos;
 using DividendHarvest.Application.Exceptions;
 using DividendHarvest.Domain.Codes;
 using DividendHarvest.Domain.Securities;
 using DividendHarvest.Infrastructure.Contracts;
+using DividendHarvest.Infrastructure.Exceptions;
 using Microsoft.Extensions.Options;
 
 namespace DividendHarvest.Infrastructure.FtShare;
 
 public sealed class FtShareStockDataProvider(
     IFtShareMcpToolInvoker toolInvoker,
-    IOptions<FtShareOptions> options) : IStockDataProvider
+    IOptions<FtShareOptions> options,
+    IDiagnosticContext diagnosticContext) : IStockDataProvider
 {
     public async Task<StockData?> GetAsync(
         AShareReference reference,
@@ -32,6 +35,8 @@ public sealed class FtShareStockDataProvider(
             currentOptions.StockProfileToolName,
             arguments,
             cancellationToken,
+            reference,
+            "profile",
             "FTShare MCP 请求超时。",
             "FTShare MCP 股票资料暂时不可用。");
         return ParseStockData(reference, payload);
@@ -55,6 +60,8 @@ public sealed class FtShareStockDataProvider(
             currentOptions.StockMarketDataToolName,
             arguments,
             cancellationToken,
+            reference,
+            "market",
             "FTShare MCP 行情请求超时。",
             "FTShare MCP 行情数据暂时不可用。");
         return ParseMarketData(reference, payload);
@@ -78,6 +85,8 @@ public sealed class FtShareStockDataProvider(
             currentOptions.StockDividendEventsToolName,
             arguments,
             cancellationToken,
+            reference,
+            "dividend",
             "FTShare MCP 股息请求超时。",
             "FTShare MCP 股息数据暂时不可用。");
         return ParseDividendData(reference, payload);
@@ -101,6 +110,8 @@ public sealed class FtShareStockDataProvider(
             currentOptions.StockFinancialSnapshotsToolName,
             arguments,
             cancellationToken,
+            reference,
+            "financial",
             "FTShare MCP 财务请求超时。",
             "FTShare MCP 财务数据暂时不可用。");
         return ParseFinancialData(reference, payload);
@@ -115,7 +126,7 @@ public sealed class FtShareStockDataProvider(
             || string.IsNullOrWhiteSpace(options.SecurityCodeArgumentName)
             || string.IsNullOrWhiteSpace(options.ExchangeCodeArgumentName))
         {
-            throw new StockDataProviderUnavailableException(
+            throw new FtShareProviderException(
                 new InvalidOperationException("FTShare MCP 股票资料工具配置不完整。"));
         }
     }
@@ -124,9 +135,17 @@ public sealed class FtShareStockDataProvider(
         string toolName,
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken,
+        AShareReference reference,
+        string dataKind,
         string timeoutMessage,
         string unavailableMessage)
     {
+        using var diagnosticScope = diagnosticContext.BeginScope(new DiagnosticScope(
+            "ftshare_mcp",
+            SecurityCode: reference.SecurityCode,
+            ExchangeCode: reference.ExchangeCode,
+            DataKind: dataKind));
+
         try
         {
             return await toolInvoker.InvokeAsync(
@@ -136,13 +155,11 @@ public sealed class FtShareStockDataProvider(
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new StockDataProviderUnavailableException(
-                new TimeoutException(timeoutMessage));
+            throw new FtShareProviderException(new TimeoutException(timeoutMessage));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            throw new StockDataProviderUnavailableException(
-                exception);
+            throw new FtShareProviderException(exception);
         }
     }
 

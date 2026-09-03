@@ -117,7 +117,7 @@ public sealed class StockPriceObservationAppServiceTests
             .ReturnsAsync((StockMarketData?)null);
         var service = CreateService(unitOfWork.Object, provider.Object);
 
-        await Assert.ThrowsAsync<StockMarketDataUnavailableException>(() =>
+        await Assert.ThrowsAsync<ApplicationErrorException>(() =>
             service.SyncAsync(
                 new SyncStockPriceRequest("000001", "SZSE"),
                 CancellationToken.None));
@@ -135,7 +135,7 @@ public sealed class StockPriceObservationAppServiceTests
         var provider = new Mock<IStockDataProvider>();
         var service = CreateService(unitOfWork.Object, provider.Object);
 
-        await Assert.ThrowsAsync<StockDataSyncValidationException>(() =>
+        await Assert.ThrowsAsync<ApplicationValidationException>(() =>
             service.SyncAsync(
                 new SyncStockPriceRequest("123", "NYSE"),
                 CancellationToken.None));

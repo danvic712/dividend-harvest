@@ -26,7 +26,8 @@ public sealed class StockAnalysisAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new StockAnalysisValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.StockAnalysisValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -40,7 +41,8 @@ public sealed class StockAnalysisAppService(
                 cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }

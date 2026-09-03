@@ -105,7 +105,7 @@ public sealed class RecommendationSnapshotAppServiceTests
             portfolioRecommendationAppService.Object,
             TimeProvider.System);
 
-        await Assert.ThrowsAsync<StockNotConfiguredException>(() =>
+        await Assert.ThrowsAsync<ApplicationErrorException>(() =>
             service.CreateAsync(CancellationToken.None));
 
         unitOfWork.Verify(x => x.Get<RecommendationSnapshot>(), Times.Never);

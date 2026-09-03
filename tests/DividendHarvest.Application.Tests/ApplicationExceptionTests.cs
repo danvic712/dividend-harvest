@@ -6,16 +6,28 @@ namespace DividendHarvest.Application.Tests;
 public sealed class ApplicationExceptionTests
 {
     [Fact]
+    public void Generic_error_factory_preserves_a_stable_code_and_safe_parameters()
+    {
+        var exception = ApplicationErrors.WithSecurity(
+            ApplicationErrorCodes.StockNotConfigured,
+            "000001");
+
+        Assert.IsType<ApplicationErrorException>(exception);
+        Assert.Equal("stock_not_configured", exception.ErrorCode);
+        Assert.Equal("000001", exception.Parameters["securityCode"]);
+    }
+
+    [Fact]
     public void Validation_exceptions_share_one_validation_seam_and_stable_error_codes()
     {
         ApplicationValidationException[] exceptions =
         [
-            new SetupValidationException("invalid"),
-            new ModelParameterValidationException("invalid"),
-            new StockAnalysisValidationException("invalid"),
-            new StockDataSyncValidationException("invalid"),
-            new BudgetValidationException("invalid"),
-            new PortfolioTradeValidationException("invalid")
+            ApplicationErrors.Validation(ApplicationErrorCodes.SetupValidationFailed, "invalid"),
+            ApplicationErrors.Validation(ApplicationErrorCodes.ModelParameterValidationFailed, "invalid"),
+            ApplicationErrors.Validation(ApplicationErrorCodes.StockAnalysisValidationFailed, "invalid"),
+            ApplicationErrors.Validation(ApplicationErrorCodes.StockDataSyncValidationFailed, "invalid"),
+            ApplicationErrors.Validation(ApplicationErrorCodes.BudgetValidationFailed, "invalid"),
+            ApplicationErrors.Validation(ApplicationErrorCodes.PortfolioTradeValidationFailed, "invalid")
         ];
 
         Assert.All(exceptions, exception => Assert.NotEmpty(exception.ErrorCode));
@@ -34,7 +46,10 @@ public sealed class ApplicationExceptionTests
     [Fact]
     public void Stock_not_configured_has_a_stable_not_found_error_code()
     {
-        var exception = new StockNotConfiguredException("000001", "SZSE");
+        var exception = ApplicationErrors.WithSecurityReference(
+            ApplicationErrorCodes.StockNotConfigured,
+            "000001",
+            "SZSE");
 
         Assert.Equal("stock_not_configured", exception.ErrorCode);
     }
@@ -44,9 +59,13 @@ public sealed class ApplicationExceptionTests
     {
         Assert.Equal(
             "cash_ledger_entry_conflict",
-            new CashLedgerEntryConflictException("cash-1").ErrorCode);
+            ApplicationErrors.WithSourceRecord(
+                ApplicationErrorCodes.CashLedgerEntryConflict,
+                "cash-1").ErrorCode);
         Assert.Equal(
             "portfolio_trade_conflict",
-            new PortfolioTradeConflictException("trade-1").ErrorCode);
+            ApplicationErrors.WithSourceRecord(
+                ApplicationErrorCodes.PortfolioTradeConflict,
+                "trade-1").ErrorCode);
     }
 }

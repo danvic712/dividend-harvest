@@ -64,7 +64,7 @@ public sealed class BudgetAppServiceTests
             CreateRepository<Security>([]));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<StockNotConfiguredException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
             new RecordCashLedgerEntryRequest(
                 new DateOnly(2026, 9, 1),
                 "buy",
@@ -176,7 +176,7 @@ public sealed class BudgetAppServiceTests
             CreateRepository([existingEntry]));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<CashLedgerEntryConflictException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
             new RecordCashLedgerEntryRequest(
                 new DateOnly(2026, 9, 1),
                 "budget_deposit",
@@ -208,7 +208,7 @@ public sealed class BudgetAppServiceTests
             .ThrowsAsync(new DbUpdateException("duplicate source record"));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<CashLedgerEntryConflictException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
             new RecordCashLedgerEntryRequest(
                 new DateOnly(2026, 9, 1),
                 "budget_deposit",
@@ -226,7 +226,7 @@ public sealed class BudgetAppServiceTests
         var unitOfWork = new Mock<IUow>();
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<BudgetValidationException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationValidationException>(() => service.RecordAsync(
             new RecordCashLedgerEntryRequest(
                 new DateOnly(2026, 9, 1),
                 "buy",

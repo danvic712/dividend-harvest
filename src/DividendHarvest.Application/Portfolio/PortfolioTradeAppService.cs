@@ -24,7 +24,8 @@ public sealed class PortfolioTradeAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new PortfolioTradeValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.PortfolioTradeValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -33,7 +34,7 @@ public sealed class PortfolioTradeAppService(
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
         {
-            throw new SetupNotCompletedException();
+            throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
         }
 
         var reference = AShareReference.Create(request.SecurityCode, request.ExchangeCode);
@@ -46,7 +47,8 @@ public sealed class PortfolioTradeAppService(
                 cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -72,12 +74,15 @@ public sealed class PortfolioTradeAppService(
         {
             if (!MatchesRequest(existingTrade, request, security.Id))
             {
-                throw new PortfolioTradeConflictException(sourceRecordId!);
+                throw ApplicationErrors.WithSourceRecord(
+                    ApplicationErrorCodes.PortfolioTradeConflict,
+                    sourceRecordId!);
             }
 
             if (position is null)
             {
-                throw new PortfolioPositionMissingForTradeException();
+                throw ApplicationErrors.Simple(
+                    ApplicationErrorCodes.PortfolioPositionMissingForTrade);
             }
 
             return ToResult(existingTrade, portfolio, reference, position);
@@ -98,7 +103,9 @@ public sealed class PortfolioTradeAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new PortfolioTradeValidationException(exception.Message);
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.PortfolioTradeValidationFailed,
+                exception.Message);
         }
 
         try
@@ -126,7 +133,8 @@ public sealed class PortfolioTradeAppService(
             }
             else if (position is null)
             {
-                throw new PortfolioPositionMissingForTradeException();
+                throw ApplicationErrors.Simple(
+                    ApplicationErrorCodes.PortfolioPositionMissingForTrade);
             }
             else
             {
@@ -135,7 +143,9 @@ public sealed class PortfolioTradeAppService(
         }
         catch (InvalidOperationException exception)
         {
-            throw new PortfolioTradeValidationException(exception.Message);
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.PortfolioTradeValidationFailed,
+                exception.Message);
         }
 
         await tradeRepository.AddAsync(trade, cancellationToken);
@@ -172,7 +182,9 @@ public sealed class PortfolioTradeAppService(
         {
             // The filtered unique index protects against concurrent duplicate
             // submissions that both pass the read-before-insert check.
-            throw new PortfolioTradeConflictException(sourceRecordId);
+            throw ApplicationErrors.WithSourceRecord(
+                ApplicationErrorCodes.PortfolioTradeConflict,
+                sourceRecordId);
         }
 
         return ToResult(trade, portfolio, reference, position);

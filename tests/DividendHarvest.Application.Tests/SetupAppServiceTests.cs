@@ -89,7 +89,7 @@ public sealed class SetupAppServiceTests
                 new SetupStockRequest("000001", "SZSE", null)
             ]);
 
-        await Assert.ThrowsAsync<SetupValidationException>(() => service.InitializeAsync(request, CancellationToken.None));
+        await Assert.ThrowsAsync<ApplicationValidationException>(() => service.InitializeAsync(request, CancellationToken.None));
 
         provider.Verify(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -102,7 +102,7 @@ public sealed class SetupAppServiceTests
         var unitOfWork = CreateUnitOfWork(repository);
         var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
 
-        await Assert.ThrowsAsync<SetupAlreadyCompletedException>(() => service.InitializeAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
@@ -121,7 +121,7 @@ public sealed class SetupAppServiceTests
         var unitOfWork = CreateUnitOfWork(repository);
         var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
 
-        await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
@@ -136,16 +136,17 @@ public sealed class SetupAppServiceTests
         var provider = new Mock<IStockDataProvider>();
         provider
             .Setup(x => x.GetAsync(It.IsAny<AShareReference>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new StockDataProviderUnavailableException(
+            .ThrowsAsync(new TestStockDataProviderFailureException(
                 new TimeoutException("FTShare MCP 请求超时。")));
         var unitOfWork = CreateUnitOfWork(repository);
         var service = new SetupAppService(unitOfWork.Object, provider.Object, CreateRequestValidator());
 
-        var exception = await Assert.ThrowsAsync<StockDataUnavailableException>(() => service.InitializeAsync(
+        var exception = await Assert.ThrowsAsync<ApplicationErrorException>(() => service.InitializeAsync(
             new SetupRequest("长期股息组合", [new SetupStockRequest("000001", "SZSE", null)]),
             CancellationToken.None));
 
-        Assert.IsType<StockDataProviderUnavailableException>(exception.InnerException);
+        Assert.Equal(ApplicationErrorCodes.StockDataUnavailable, exception.ErrorCode);
+        Assert.IsAssignableFrom<IStockDataProviderFailure>(exception.InnerException);
         unitOfWork.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
         repository.Verify(x => x.AddAsync(It.IsAny<PortfolioEntity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -161,7 +162,7 @@ public sealed class SetupAppServiceTests
             provider.Object,
             CreateRequestValidator());
 
-        var exception = await Assert.ThrowsAsync<SetupValidationException>(() => service.InitializeAsync(
+        var exception = await Assert.ThrowsAsync<ApplicationValidationException>(() => service.InitializeAsync(
             new SetupRequest(" ", []),
             CancellationToken.None));
 
@@ -227,4 +228,7 @@ public sealed class SetupAppServiceTests
             .ReturnsAsync(3);
         return unitOfWork;
     }
+
+    private sealed class TestStockDataProviderFailureException(Exception innerException)
+        : Exception(null, innerException), IStockDataProviderFailure;
 }

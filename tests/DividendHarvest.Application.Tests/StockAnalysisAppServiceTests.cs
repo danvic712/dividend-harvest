@@ -347,7 +347,7 @@ public sealed class StockAnalysisAppServiceTests
         var unitOfWork = new Mock<IUow>();
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<StockAnalysisValidationException>(() =>
+        await Assert.ThrowsAsync<ApplicationValidationException>(() =>
             service.GetAsync(
                 new GetStockAnalysisRequest("123", "NYSE"),
                 CancellationToken.None));

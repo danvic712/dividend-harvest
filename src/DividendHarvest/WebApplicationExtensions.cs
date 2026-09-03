@@ -1,9 +1,12 @@
 using DividendHarvest.Domain.Contracts;
+using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Diagnostics;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using ApplicationDiagnosticContext = DividendHarvest.Application.Contracts.IDiagnosticContext;
 
 namespace DividendHarvest;
 
@@ -11,6 +14,7 @@ public static class WebApplicationExtensions
 {
     public static WebApplication UseDividendHarvest(this WebApplication app)
     {
+        app.UseDividendHarvestDiagnosticContext();
         app.UseExceptionHandler();
         app.UseSerilogRequestLogging();
         app.UseSwagger();
@@ -33,6 +37,25 @@ public static class WebApplicationExtensions
         app.MapHealthChecks("/readyz", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("ready")
+        });
+
+        return app;
+    }
+
+    private static IApplicationBuilder UseDividendHarvestDiagnosticContext(
+        this IApplicationBuilder app)
+    {
+        app.Use(async (httpContext, next) =>
+        {
+            var diagnosticContext = httpContext.RequestServices
+                .GetRequiredService<ApplicationDiagnosticContext>();
+            var correlationId = httpContext.TraceIdentifier;
+            httpContext.Response.Headers["X-Correlation-Id"] = correlationId;
+
+            using var diagnosticScope = diagnosticContext.BeginScope(new DiagnosticScope(
+                "http_request",
+                CorrelationId: correlationId));
+            await next();
         });
 
         return app;

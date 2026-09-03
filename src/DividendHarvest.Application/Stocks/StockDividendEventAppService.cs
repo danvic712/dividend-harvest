@@ -25,7 +25,8 @@ public sealed class StockDividendEventAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new StockDataSyncValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.StockDataSyncValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -39,7 +40,8 @@ public sealed class StockDividendEventAppService(
                 cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -51,16 +53,19 @@ public sealed class StockDividendEventAppService(
                 reference,
                 cancellationToken);
         }
-        catch (StockDataProviderUnavailableException exception)
+        catch (Exception exception) when (exception is IStockDataProviderFailure)
         {
-            throw new StockDividendDataUnavailableException(
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockDividendDataUnavailable,
                 reference.SecurityCode,
                 exception);
         }
 
         if (dividendData is null)
         {
-            throw new StockDividendDataUnavailableException(reference.SecurityCode);
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockDividendDataUnavailable,
+                reference.SecurityCode);
         }
 
         var eventRepository = uow.Get<DividendEvent>();
@@ -79,12 +84,16 @@ public sealed class StockDividendEventAppService(
         {
             if (data is null || !MatchesReference(reference, data))
             {
-                throw new StockDividendDataUnavailableException(reference.SecurityCode);
+                throw ApplicationErrors.WithSecurity(
+                    ApplicationErrorCodes.StockDividendDataUnavailable,
+                    reference.SecurityCode);
             }
 
             if (!seenSourceRecordIds.Add(data.SourceRecordId))
             {
-                throw new StockDividendDataUnavailableException(reference.SecurityCode);
+                throw ApplicationErrors.WithSecurity(
+                    ApplicationErrorCodes.StockDividendDataUnavailable,
+                    reference.SecurityCode);
             }
 
             if (existingBySourceRecordId.TryGetValue(
@@ -157,7 +166,8 @@ public sealed class StockDividendEventAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new StockDividendDataUnavailableException(
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockDividendDataUnavailable,
                 data.SecurityCode,
                 exception);
         }

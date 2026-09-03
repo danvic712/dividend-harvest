@@ -38,7 +38,8 @@ public sealed class SetupAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new SetupValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.SetupValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -46,7 +47,7 @@ public sealed class SetupAppService(
             .GetQueryable(asNoTracking: true)
             .AnyAsync(cancellationToken))
         {
-            throw new SetupAlreadyCompletedException();
+            throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupAlreadyCompleted);
         }
 
         var portfolioName = request.PortfolioName.Trim();
@@ -60,7 +61,9 @@ public sealed class SetupAppService(
                 }
                 catch (ArgumentException exception)
                 {
-                    throw new SetupValidationException(exception.Message);
+                    throw ApplicationErrors.Validation(
+                        ApplicationErrorCodes.SetupValidationFailed,
+                        exception.Message);
                 }
             })
             .ToArray();
@@ -77,14 +80,19 @@ public sealed class SetupAppService(
             {
                 stockData = await stockDataProvider.GetAsync(reference, cancellationToken);
             }
-            catch (StockDataProviderUnavailableException exception)
+            catch (Exception exception) when (exception is IStockDataProviderFailure)
             {
-                throw new StockDataUnavailableException(reference.SecurityCode, exception);
+                throw ApplicationErrors.WithSecurity(
+                    ApplicationErrorCodes.StockDataUnavailable,
+                    reference.SecurityCode,
+                    exception);
             }
 
             if (stockData is null)
             {
-                throw new StockDataUnavailableException(reference.SecurityCode);
+                throw ApplicationErrors.WithSecurity(
+                    ApplicationErrorCodes.StockDataUnavailable,
+                    reference.SecurityCode);
             }
 
             ValidateStockData(reference, stockData);
@@ -168,7 +176,9 @@ public sealed class SetupAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new SetupValidationException(exception.Message);
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.SetupValidationFailed,
+                exception.Message);
         }
     }
 
@@ -180,7 +190,9 @@ public sealed class SetupAppService(
             || string.IsNullOrWhiteSpace(stockData.MarketCode)
             || string.IsNullOrWhiteSpace(stockData.CurrencyCode))
         {
-            throw new StockDataUnavailableException(reference.SecurityCode);
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockDataUnavailable,
+                reference.SecurityCode);
         }
     }
 

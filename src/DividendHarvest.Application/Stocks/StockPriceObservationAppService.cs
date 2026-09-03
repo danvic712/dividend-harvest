@@ -25,7 +25,8 @@ public sealed class StockPriceObservationAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new StockDataSyncValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.StockDataSyncValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -39,7 +40,8 @@ public sealed class StockPriceObservationAppService(
                 cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -51,16 +53,19 @@ public sealed class StockPriceObservationAppService(
                 reference,
                 cancellationToken);
         }
-        catch (StockDataProviderUnavailableException exception)
+        catch (Exception exception) when (exception is IStockDataProviderFailure)
         {
-            throw new StockMarketDataUnavailableException(
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockMarketDataUnavailable,
                 reference.SecurityCode,
                 exception);
         }
 
         if (marketData is null || !MatchesReference(reference, marketData))
         {
-            throw new StockMarketDataUnavailableException(reference.SecurityCode);
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockMarketDataUnavailable,
+                reference.SecurityCode);
         }
 
         PriceObservation? existingObservation = await uow.Get<PriceObservation>()
@@ -121,7 +126,8 @@ public sealed class StockPriceObservationAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new StockMarketDataUnavailableException(
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockMarketDataUnavailable,
                 marketData.SecurityCode,
                 exception);
         }

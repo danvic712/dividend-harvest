@@ -141,7 +141,7 @@ public sealed class PortfolioTradeAppServiceTests
             CreateRepository<CashLedgerEntry>([]));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<PortfolioTradeValidationException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationValidationException>(() => service.RecordAsync(
             new RecordPortfolioTradeRequest(
                 security.SecurityCode,
                 security.ExchangeCode,
@@ -250,7 +250,7 @@ public sealed class PortfolioTradeAppServiceTests
             CreateRepository<CashLedgerEntry>([]));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<PortfolioTradeConflictException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
             new RecordPortfolioTradeRequest(
                 security.SecurityCode,
                 security.ExchangeCode,
@@ -287,7 +287,7 @@ public sealed class PortfolioTradeAppServiceTests
             .ThrowsAsync(new DbUpdateException("duplicate source record"));
         var service = CreateService(unitOfWork.Object);
 
-        await Assert.ThrowsAsync<PortfolioTradeConflictException>(() => service.RecordAsync(
+        await Assert.ThrowsAsync<ApplicationErrorException>(() => service.RecordAsync(
             new RecordPortfolioTradeRequest(
                 security.SecurityCode,
                 security.ExchangeCode,

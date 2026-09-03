@@ -10,8 +10,6 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
 {
     private const string ResourceMarker = ".locales.";
     private const string JsonSuffix = ".json";
-    private const string UnknownErrorCode = "application_error_unknown";
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -225,36 +223,15 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
 
         foreach (var (cultureName, cultureDefinitions) in cultures)
         {
-            if (!cultureDefinitions.ContainsKey(UnknownErrorCode))
+            if (!cultureDefinitions.ContainsKey(ApplicationErrorCodes.Unknown))
             {
                 throw new InvalidOperationException(
-                    $"Locale '{cultureName}' must define '{UnknownErrorCode}'.");
+                    $"Locale '{cultureName}' must define '{ApplicationErrorCodes.Unknown}'.");
             }
         }
 
-        var exceptionCodes = assembly
-            .GetTypes()
-            .Where(type => !type.IsAbstract && typeof(ApplicationExceptionBase).IsAssignableFrom(type))
-            .Select(type =>
-            {
-                var attribute = type.GetCustomAttribute<ApplicationErrorCodeAttribute>()
-                    ?? throw new InvalidOperationException(
-                        $"Application exception '{type.FullName}' must declare {nameof(ApplicationErrorCodeAttribute)}.");
-                return (Type: type, ErrorCode: attribute.ErrorCode);
-            })
-            .ToArray();
-        var duplicateExceptionCodes = exceptionCodes
-            .GroupBy(item => item.ErrorCode, StringComparer.Ordinal)
-            .FirstOrDefault(group => group.Count() > 1);
-        if (duplicateExceptionCodes is not null)
-        {
-            throw new InvalidOperationException(
-                $"Application error code '{duplicateExceptionCodes.Key}' is used by multiple exception types.");
-        }
-
-        var expectedCodes = exceptionCodes
-            .Select(item => item.ErrorCode)
-            .Append(UnknownErrorCode)
+        var expectedCodes = ApplicationErrorCodes.All
+            .Append(ApplicationErrorCodes.Unknown)
             .Order(StringComparer.Ordinal)
             .ToArray();
         foreach (var (cultureName, cultureDefinitions) in cultures)

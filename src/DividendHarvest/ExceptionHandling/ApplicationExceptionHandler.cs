@@ -1,13 +1,15 @@
 using DividendHarvest.Application.Contracts;
+using DividendHarvest.Application.Diagnostics;
 using DividendHarvest.Application.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
+using DividendHarvest.Contracts;
 
 namespace DividendHarvest.ExceptionHandling;
 
 public sealed class ApplicationExceptionHandler(
-    IProblemDetailsService problemDetailsService,
     IApplicationErrorCatalog errorCatalog,
+    IDiagnosticContext diagnosticContext,
+    IHttpErrorRenderer errorRenderer,
     ILogger<ApplicationExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
@@ -24,28 +26,22 @@ public sealed class ApplicationExceptionHandler(
             applicationException,
             httpContext.Request.Headers.AcceptLanguage.ToString());
 
+        using var diagnosticScope = diagnosticContext.BeginScope(new DiagnosticScope(
+            "http_error",
+            CorrelationId: httpContext.TraceIdentifier,
+            ErrorCode: localizedError.ErrorCode,
+            Severity: "warning"));
+        var causeType = exception.InnerException?.GetType().Name ?? exception.GetType().Name;
         logger.LogWarning(
-            "Application request failed with status code {StatusCode}, error code {ErrorCode}, and locale {Locale}.",
+            "Application request failed with status code {StatusCode}, error code {ErrorCode}, locale {Locale}, and cause type {CauseType}.",
             localizedError.StatusCode,
             localizedError.ErrorCode,
-            localizedError.CultureName);
+            localizedError.CultureName,
+            causeType);
 
-        httpContext.Response.StatusCode = localizedError.StatusCode;
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = localizedError.StatusCode,
-                Title = localizedError.Title,
-                Detail = localizedError.Detail,
-                Extensions =
-                {
-                    ["error_code"] = localizedError.ErrorCode,
-                    ["locale"] = localizedError.CultureName
-                }
-            }
-        });
+        return await errorRenderer.RenderAsync(
+            httpContext,
+            localizedError,
+            cancellationToken);
     }
 }

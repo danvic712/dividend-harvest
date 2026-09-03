@@ -84,6 +84,7 @@ src/
 │   ├── Contracts/                      # Application 对外 Interface
 │   │   ├── ISetupAppService.cs
 │   │   ├── IStockDataProvider.cs
+│   │   ├── IStockDataProviderFailure.cs
 │   │   ├── IStockWatchlistAppService.cs
 │   │   ├── IStockModelParameterAppService.cs
 │   │   ├── IStockPriceObservationAppService.cs
@@ -125,6 +126,8 @@ src/
 │   │   └── EFUow.cs
 │   ├── InfrastructureServiceCollectionExtensions.cs
 │   ├── DividendHarvestDbContext.cs     # EF Core DbContext
+│   ├── Exceptions/                     # Infrastructure Adapter 异常
+│   │   └── FtShareProviderException.cs
 │   └── FtShare/                        # FTShare MCP Adapter 实现
 └── DividendHarvest/                    # ASP.NET Core Controllers Host
     ├── appsettings.json                # 本地默认配置
@@ -137,6 +140,13 @@ src/
     │   └── PortfolioController.cs
     ├── Background/                     # ASP.NET Core 后台调度
     │   └── DailyStockDataSyncHostedService.cs
+    ├── Contracts/                      # Host 层可替换边界
+    │   └── IHttpErrorRenderer.cs
+    ├── Diagnostics/                    # 隐私感知的 Serilog 诊断上下文
+    │   └── SerilogDiagnosticContext.cs
+    ├── ExceptionHandling/              # 异常编排与 ProblemDetails 输出
+    │   ├── ApplicationExceptionHandler.cs
+    │   └── ProblemDetailsErrorRenderer.cs
     ├── HostServiceCollectionExtensions.cs
     ├── WebApplicationExtensions.cs
     └── HealthChecks/                   # 原生 ASP.NET Core Health Checks
@@ -154,7 +164,7 @@ Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfo
 
 1. 本项目声明的所有 Interface 必须位于所属项目的 `Contracts/` 文件夹；一个文件只放一个 Interface。
 2. 所有 DTO 必须位于 `Dtos/` 文件夹；一个 DTO 文件只允许包含一个 DTO class/record。
-3. 所有自定义 Exception 必须位于 `Exceptions/` 文件夹；一个文件只放一个 Exception。
+3. 所有自定义 Exception 必须位于 `Exceptions/` 文件夹；一个文件只放一个 Exception。错误码较多时使用通用异常类型和集中式错误码/参数工厂，不为每个业务错误码创建一个同构异常类。
 4. 如果新增真正的枚举，必须放到所属项目的 `Enums/` 文件夹；字符串业务代码集中放在 `Codes/`，不创建空的伪实现。
 5. `Application` 的业务实现类使用 `*AppService` 后缀；对应 Interface 使用 `I*AppService`。
 6. 数据访问实现按照 `salary-insights` 拆分到 `Infrastructure/Repositories/` 和 Infrastructure 根目录的 DbContext，不使用单独的 `Persistence` 命名层。
@@ -396,6 +406,8 @@ FtShareMcpToolInvoker ──> official MCP Client ──> FTShare MCP
 
 MCP 地址、工具名、股票代码参数名、交易所参数名和请求超时通过运行时配置注入。FTShare key 不进入代码、DTO、日志、镜像前端资源或 Git。
 
+FTShare 连接、协议、配置和超时失败先由 Adapter 转换为 Infrastructure 的 `FtShareProviderException`，该异常实现 Application Contracts 中的 `IStockDataProviderFailure` 标记接口；Application 再把它转换为 `stock_data_provider_unavailable` 或具体数据类型的业务错误。这样 Infrastructure 不直接依赖 Application 的业务异常，Application 也不依赖具体 Adapter 类型。
+
 ## 10. 公共运行能力
 
 ### 10.1 Swagger 与 OpenAPI
@@ -404,7 +416,7 @@ Host 使用 Swashbuckle 生成 OpenAPI 文档并提供 Swagger UI。当前业务
 
 ### 10.2 Serilog
 
-Host 使用 Serilog 接管 ASP.NET Core 和应用的 `ILogger<T>` 日志，配置来源为 `appsettings.json` 与 `appsettings.Production.json`，默认输出到容器标准输出。`UseSerilogRequestLogging` 记录 HTTP 请求摘要，业务日志使用结构化属性；请求体、Authorization、FTShare 凭据和原始外部响应不得写入日志。
+Host 使用 Serilog 接管 ASP.NET Core 和应用的 `ILogger<T>` 日志，配置来源为 `appsettings.json` 与 `appsettings.Production.json`，默认输出到容器标准输出。`UseSerilogRequestLogging` 记录 HTTP 请求摘要，业务日志使用结构化属性；请求体、Authorization、FTShare 凭据和原始外部响应不得写入日志。请求、后台同步和 FTShare 调用通过统一诊断上下文写入受控的关联字段。
 
 ### 10.3 Mapperly
 
@@ -421,19 +433,27 @@ Application 使用 Riok.Mapperly 生成编译期映射代码，统一的映射�
 
 ## 11. Exception 设计
 
-Application 自定义异常统一位于 `Application/Exceptions/`：
+Application 自定义异常统一位于 `Application/Exceptions/`，但不再为每个业务错误码创建一个异常类。异常模型收窄为：
 
-- `SetupValidationException`：请求数据违反用例输入约束。
-- `SetupAlreadyCompletedException`：系统已经完成首次建账。
-- `StockDataUnavailableException`：用例无法获得可靠的股票基础资料。
-- `StockDataProviderUnavailableException`：外部资料 Adapter 的连接、协议或配置失败，由 Setup 用例转换为 `StockDataUnavailableException`。
-- `CashLedgerEntryConflictException` 和 `PortfolioTradeConflictException`：同一组合的 `source_record_id` 已存在，但请求内容不一致。
+- `ApplicationExceptionBase`：统一承载稳定 `ErrorCode`、结构化参数和仅供内部诊断的 `InnerException`。
+- `ApplicationErrorException`：承载状态、冲突、未配置、外部资料不可用等非验证错误。
+- `ApplicationValidationException`：承载由 FluentValidation 或 Domain 不变量转换而来的验证诊断。
+- `ApplicationErrorCodes`：稳定错误码的唯一代码清单；`ApplicationErrors` 按参数形状提供集中式工厂。
 
-所有 Application 异常都通过 `ApplicationErrorCodeAttribute` 声明稳定的 `error_code`，并携带供文本插值使用的结构化参数；异常类型不保存固定的用户界面文案，验证异常只保留统一验证器产生的结构化诊断。`locales/{culture}/{domain}.json` 为每个错误码定义 HTTP 状态、标题和详情，Application 的 `IApplicationErrorCatalog` 负责加载嵌入式资源、校验各语言错误码集合并执行语言选择与参数插值。
+错误码仍然按业务语义细分，例如 `stock_market_data_unavailable` 和 `portfolio_trade_conflict`，但错误码与异常类型解耦。这样既保留 `locales/{culture}/{domain}.json`、HTTP 状态和参数占位符的精确语义，也避免大量只重复错误码和字典参数的类。目录加载时校验 `ApplicationErrorCodes.All` 与语言 JSON 的完整集合，而不是反射扫描异常类属性。
 
-Host 的 `ApplicationExceptionHandler` 只负责把错误目录解析出的结果写成 ProblemDetails：验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503，并通过扩展返回 `error_code` 和 `locale`。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；内部日志仍可通过结构化日志记录稳定错误码和状态。调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
+Host 的 `ApplicationExceptionHandler` 只负责识别 Application 异常、调用 `IApplicationErrorCatalog` 解析语言和参数、记录安全的结构化日志，并把已解析的安全结果交给 `IHttpErrorRenderer`。renderer 不接收原始 `Exception`，`ProblemDetailsErrorRenderer` 只负责 HTTP 响应形状，返回目录解析出的 `status`、`title`、`detail`、稳定 `error_code`、`locale` 和 `trace_id`。验证错误映射为 400、状态冲突映射为 409、未配置股票映射为 404、外部资料不可用映射为 503。异常的 `InnerException`、FTShare 原始响应和凭据不会进入公共详情；调用方主动取消的 `OperationCanceledException` 不转换，继续传播。
 
-新增 Application 异常时，必须同时使用 `ApplicationErrorCodeAttribute` 声明稳定错误码、在每个受支持语言的对应领域 JSON 中定义该错误码，并补充 Application 单元测试；缺少异常声明、缺少定义、重复定义、跨语言状态码/占位符不一致、非法状态码或空文本应在目录加载时直接失败，而不是运行到请求时才产生隐性回退。
+新增错误时，只需在 `ApplicationErrorCodes` 添加稳定码、在每个受支持语言的对应领域 JSON 中定义它、通过 `ApplicationErrors` 选择结构化参数工厂并补充 Application 单元测试。缺少错误码定义、重复定义、跨语言状态码/占位符不一致、非法状态码或空文本应在目录加载时直接失败，而不是运行到请求时才产生隐性回退。
+
+### 11.1 隐私感知的诊断上下文
+
+`IDiagnosticContext` 位于 `Application/Contracts/`，Host 使用 `SerilogDiagnosticContext` 实现，并在 `HostServiceCollectionExtensions` 中注册。它只允许写入固定的安全字段：
+
+- `diagnostic_operation`、`correlation_id`、`run_id`、`error_code`、`severity`；其中操作只允许 `http_request`、`http_error`、`daily_stock_data_sync` 和 `ftshare_mcp`。
+- A 股 `security_code`、`exchange_code` 和有限集合的 `data_kind`（`profile`、`market`、`dividend`、`financial`）。
+
+`WebApplicationExtensions` 为每个 HTTP 请求创建 correlation scope 并返回 `X-Correlation-Id`；Application 异常响应同时返回 `trace_id`。`DailyStockDataSyncHostedService` 为每次交易日同步创建独立 run scope；`FtShareStockDataProvider` 为每次资料、行情、股息和财务 MCP 调用追加股票引用和数据类型。诊断上下文不接受任意字典，超过长度、包含不允许字符或不在有限集合中的值会被丢弃；内部日志最多记录异常类型和 cause type，不记录异常消息，避免把请求正文、持仓数量、认证信息、FTShare key、原始响应和内部异常文本带入日志或 ProblemDetails。
 
 ## 12. 测试策略
 

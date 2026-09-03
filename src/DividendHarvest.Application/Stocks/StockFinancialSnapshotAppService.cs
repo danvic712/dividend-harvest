@@ -25,7 +25,8 @@ public sealed class StockFinancialSnapshotAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new StockDataSyncValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.StockDataSyncValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -39,7 +40,8 @@ public sealed class StockFinancialSnapshotAppService(
                 cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -51,16 +53,19 @@ public sealed class StockFinancialSnapshotAppService(
                 reference,
                 cancellationToken);
         }
-        catch (StockDataProviderUnavailableException exception)
+        catch (Exception exception) when (exception is IStockDataProviderFailure)
         {
-            throw new StockFinancialDataUnavailableException(
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockFinancialDataUnavailable,
                 reference.SecurityCode,
                 exception);
         }
 
         if (financialData is null)
         {
-            throw new StockFinancialDataUnavailableException(reference.SecurityCode);
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockFinancialDataUnavailable,
+                reference.SecurityCode);
         }
 
         var snapshotRepository = uow.Get<FinancialSnapshot>();
@@ -78,12 +83,16 @@ public sealed class StockFinancialSnapshotAppService(
         {
             if (data is null || !MatchesReference(reference, data))
             {
-                throw new StockFinancialDataUnavailableException(reference.SecurityCode);
+                throw ApplicationErrors.WithSecurity(
+                    ApplicationErrorCodes.StockFinancialDataUnavailable,
+                    reference.SecurityCode);
             }
 
             if (!seenDates.Add(data.DataAsOfDate))
             {
-                throw new StockFinancialDataUnavailableException(reference.SecurityCode);
+                throw ApplicationErrors.WithSecurity(
+                    ApplicationErrorCodes.StockFinancialDataUnavailable,
+                    reference.SecurityCode);
             }
 
             if (existingByDate.TryGetValue(data.DataAsOfDate, out var existingSnapshot))
@@ -153,7 +162,8 @@ public sealed class StockFinancialSnapshotAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new StockFinancialDataUnavailableException(
+            throw ApplicationErrors.WithSecurity(
+                ApplicationErrorCodes.StockFinancialDataUnavailable,
                 data.SecurityCode,
                 exception);
         }

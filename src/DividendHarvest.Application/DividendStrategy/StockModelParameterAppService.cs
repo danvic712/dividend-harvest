@@ -26,7 +26,8 @@ public sealed class StockModelParameterAppService(
         var validationResult = await getRequestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new ModelParameterValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.ModelParameterValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -34,7 +35,8 @@ public sealed class StockModelParameterAppService(
         var security = await FindSecurityAsync(reference, cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -64,7 +66,8 @@ public sealed class StockModelParameterAppService(
         var validationResult = await saveRequestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new ModelParameterValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.ModelParameterValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -72,7 +75,8 @@ public sealed class StockModelParameterAppService(
         var security = await FindSecurityAsync(reference, cancellationToken);
         if (security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -82,7 +86,7 @@ public sealed class StockModelParameterAppService(
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
         {
-            throw new SetupNotCompletedException();
+            throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
         }
 
         var parameterRepository = uow.Get<ModelParameterSet>();
@@ -94,7 +98,8 @@ public sealed class StockModelParameterAppService(
                 cancellationToken);
         if (versionExists)
         {
-            throw new ModelParameterVersionAlreadyExistsException(
+            throw ApplicationErrors.WithModelParameterVersion(
+                ApplicationErrorCodes.ModelParameterVersionAlreadyExists,
                 reference.SecurityCode,
                 request.EffectiveFromDate);
         }
@@ -151,7 +156,9 @@ public sealed class StockModelParameterAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new ModelParameterValidationException(exception.Message);
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.ModelParameterValidationFailed,
+                exception.Message);
         }
     }
 

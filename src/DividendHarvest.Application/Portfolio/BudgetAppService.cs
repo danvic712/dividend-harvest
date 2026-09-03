@@ -26,7 +26,8 @@ public sealed class BudgetAppService(
         var validationResult = await requestValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            throw new BudgetValidationException(
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.BudgetValidationFailed,
                 ValidationErrorFormatter.Format(validationResult));
         }
 
@@ -35,7 +36,7 @@ public sealed class BudgetAppService(
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
         {
-            throw new SetupNotCompletedException();
+            throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
         }
 
         var reference = string.IsNullOrWhiteSpace(request.SecurityCode)
@@ -52,7 +53,8 @@ public sealed class BudgetAppService(
                     cancellationToken);
         if (reference is not null && security is null)
         {
-            throw new StockNotConfiguredException(
+            throw ApplicationErrors.WithSecurityReference(
+                ApplicationErrorCodes.StockNotConfigured,
                 reference.SecurityCode,
                 reference.ExchangeCode);
         }
@@ -71,7 +73,9 @@ public sealed class BudgetAppService(
             {
                 if (!MatchesRequest(existingEntry, request, security?.Id))
                 {
-                    throw new CashLedgerEntryConflictException(sourceRecordId);
+                    throw ApplicationErrors.WithSourceRecord(
+                        ApplicationErrorCodes.CashLedgerEntryConflict,
+                        sourceRecordId);
                 }
 
                 return ApplicationMapper.ToCashLedgerEntryResult(
@@ -95,7 +99,9 @@ public sealed class BudgetAppService(
         }
         catch (ArgumentException exception)
         {
-            throw new BudgetValidationException(exception.Message);
+            throw ApplicationErrors.Validation(
+                ApplicationErrorCodes.BudgetValidationFailed,
+                exception.Message);
         }
 
         await ledgerRepository.AddAsync(entry, cancellationToken);
@@ -107,7 +113,9 @@ public sealed class BudgetAppService(
         {
             // The filtered unique index protects against two concurrent retries
             // that both pass the read-before-insert idempotency check.
-            throw new CashLedgerEntryConflictException(sourceRecordId);
+            throw ApplicationErrors.WithSourceRecord(
+                ApplicationErrorCodes.CashLedgerEntryConflict,
+                sourceRecordId);
         }
 
         return ApplicationMapper.ToCashLedgerEntryResult(
@@ -124,7 +132,7 @@ public sealed class BudgetAppService(
             .SingleOrDefaultAsync(cancellationToken);
         if (portfolio is null)
         {
-            throw new SetupNotCompletedException();
+            throw ApplicationErrors.Simple(ApplicationErrorCodes.SetupNotCompleted);
         }
 
         var entries = await uow.Get<CashLedgerEntry>()

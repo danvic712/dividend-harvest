@@ -94,7 +94,7 @@ public sealed class StockDividendEventAppServiceTests
             .ReturnsAsync((IReadOnlyList<StockDividendData>?)null);
         var service = CreateService(unitOfWork.Object, provider.Object);
 
-        await Assert.ThrowsAsync<StockDividendDataUnavailableException>(() =>
+        await Assert.ThrowsAsync<ApplicationErrorException>(() =>
             service.SyncAsync(
                 new SyncStockDividendsRequest("000001", "SZSE"),
                 CancellationToken.None));
