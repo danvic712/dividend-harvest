@@ -126,7 +126,7 @@ public sealed class FtShareMcpToolInvoker(
 
     private static TimeSpan CalculateRetryDelay(TimeSpan baseDelay, int attempt)
     {
-        var multiplier = Math.Min(attempt + 1, 4);
+        var multiplier = 1 << Math.Min(attempt, 4);
         return TimeSpan.FromMilliseconds(baseDelay.TotalMilliseconds * multiplier);
     }
 }
