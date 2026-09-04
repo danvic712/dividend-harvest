@@ -556,3 +556,23 @@ button { cursor: pointer; }
   .overview-page .d-story h1 { font-size: 54px; }
   .overview-page .d-hero-copy { font-size: 13px; }
 }
+
+@media (min-width: 761px) {
+  .app-frame-overview .d-header { width: 100%; margin-inline: 0; padding-inline: max(clamp(24px, 3vw, 48px), calc((100% - 1780px) / 2)); }
+  .app-frame-overview .page-wrap,
+  .app-frame-overview .app-footer { width: min(100% - clamp(48px, 6vw, 96px), 1780px); margin-inline: auto; }
+  .app-frame-overview .page-wrap { padding-inline: 0; }
+  .app-frame-overview .app-footer { padding-inline: 0; }
+}
+
+/* Plain-language hierarchy for users who do not know the model vocabulary. */
+.overview-page .d-card-topline { letter-spacing: .09em; }
+.overview-page .d-card-description { max-width: 46em; font-size: 12px; line-height: 1.65; }
+.overview-page .d-pending-status-label { color: var(--attention-strong); }
+.overview-page .d-pending-next p { max-width: 48em; font-size: 12px; }
+.overview-page .d-pending-actions button { min-height: 36px; }
+
+@media (max-width: 760px) {
+  .overview-page .d-watchlist-heading > span { line-height: 1.5; }
+  .overview-page .d-pending-actions button { width: 100%; justify-content: space-between; }
+}

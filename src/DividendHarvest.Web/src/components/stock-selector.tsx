@@ -4,10 +4,10 @@ import { cn, stockKey } from "@/lib/utils"
 import { displayStockName, hasAnalysisData, recommendationLabel, recommendationTone } from "@/lib/stock-display"
 import type { StockRecommendationResult, StockWatchlistItem } from "@/lib/api-types"
 
-export function StockSelector({ stocks, selectedKey, onSelect, recommendations = [] }: { stocks: StockWatchlistItem[]; selectedKey: string | null; onSelect: (stock: StockWatchlistItem) => void; recommendations?: StockRecommendationResult[] }) {
+export function StockSelector({ stocks, selectedKey, onSelect, recommendations = [], description }: { stocks: StockWatchlistItem[]; selectedKey: string | null; onSelect: (stock: StockWatchlistItem) => void; recommendations?: StockRecommendationResult[]; description?: string }) {
   return (
     <section className="d-watchlist">
-      <div className="d-watchlist-heading"><div><div className="d-kicker"><span>00</span><span>我的股票</span><i /></div><h2>今天先看哪一只？</h2></div><span>{stocks.length} 只关注标的 · 每只单独配置</span></div>
+      <div className="d-watchlist-heading"><div><div className="d-kicker"><span>00</span><span>我的股票</span><i /></div><h2>今天先看哪一只？</h2></div><span>{description ?? `${stocks.length} 只关注标的 · 每只单独配置`}</span></div>
       <div className="stock-rail d-stock-rail" role="list" aria-label="股票列表">
       {stocks.map((stock) => {
         const selected = stockKey(stock) === selectedKey

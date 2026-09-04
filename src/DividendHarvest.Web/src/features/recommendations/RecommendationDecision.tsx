@@ -41,12 +41,12 @@ export function RecommendationDecision({ recommendation, onRecord }: { recommend
         </div>
 
         <section className="surface d-signal-card">
-          <div className="d-card-topline"><span>02 / 03 · 信号依据</span><Target size={16} /></div>
+          <div className="d-card-topline"><span>02 / 03 · 为什么这样建议</span><Target size={16} /></div>
           <h2>{recommendationSignalTitle(analysis.recommendationCode)}</h2>
-          <p className="d-card-description">TTM 实际股息 ÷ 当前价格 · 数据截至 {analysis.dataAsOfDate ?? "暂无数据日"}</p>
+          <p className="d-card-description">最近 12 个月实际股息 ÷ 当前价格 · 数据截至 {analysis.dataAsOfDate ?? "暂无数据日"}</p>
           <div className="d-readout-grid">
-            <div><span>当前价格</span><strong>{formatMoney(analysis.closePrice)}</strong><em>{analysis.priceZoneConfirmed ? "价格区间已确认" : "价格区间待确认"}</em></div>
-            <div><span>TTM 股息率</span><strong>{formatPercent(analysis.dividendYield)}</strong><small>实际股息 {formatMoney(analysis.modelDividendPerShare)} / 股</small></div>
+            <div><span>最近价格</span><strong>{formatMoney(analysis.closePrice)}</strong><em>{analysis.priceZoneConfirmed ? "价格区间已确认" : "价格区间待确认"}</em></div>
+            <div><span>实际股息率</span><strong>{formatPercent(analysis.dividendYield)}</strong><small>最近 12 个月合计 {formatMoney(analysis.modelDividendPerShare)} / 股</small></div>
           </div>
           <div className="d-reason-list">
             <div><span><Check size={12} /></span><p>模型状态：{analysis.modelStatusCode}；股息可靠性：{analysis.dividendReliabilityCode}。</p></div>
@@ -58,7 +58,7 @@ export function RecommendationDecision({ recommendation, onRecord }: { recommend
       </section>
 
       <section className="d-ladder-section">
-        <div className="d-section-head"><div><div className="d-kicker"><span>02</span><span>价格阶梯</span><i /></div><h2>每个价位，买不同的分量。</h2><p>把“可以买”翻译成下一步能执行的动作。</p></div><div className="d-current-price"><span>当前价格</span><strong>{formatMoney(analysis.closePrice)}</strong><small>落在「{currentZone}」</small></div></div>
+        <div className="d-section-head"><div><div className="d-kicker"><span>02</span><span>价格阶梯</span><i /></div><h2>什么时候可以买、买多少？</h2><p>价格越合适，建议的买入分量越大；分几次执行，不一次用完预算。</p></div><div className="d-current-price"><span>最近价格</span><strong>{formatMoney(analysis.closePrice)}</strong><small>落在「{currentZone}」</small></div></div>
         <div className="surface d-ladder-card">
           <PriceLadder analysis={analysis} />
           <PriceZoneBoard analysis={analysis} />
@@ -69,7 +69,7 @@ export function RecommendationDecision({ recommendation, onRecord }: { recommend
       <section className="d-plan-grid">
         <div className="surface d-plan-card">
           <div className="d-card-topline"><span>03 / 03 · 执行计划</span><Coins size={16} /></div>
-          <h2>下一步怎么做</h2>
+          <h2>照着这三步执行</h2>
           <p className="d-card-description">{securityName} 单独配置，核心仓不动。</p>
           <div className="d-plan-list">
             <div className="d-plan-row"><span className="d-plan-number d-plan-add">01</span><div><strong>当前区间</strong><span>{currentZone}</span></div><div className="d-plan-action"><b>{actionLabel}</b><small>{formatMoney(recommendation.suggestedTradeAmount)}</small></div><Check size={15} /></div>
@@ -89,7 +89,7 @@ export function RecommendationDecision({ recommendation, onRecord }: { recommend
       </section>
 
       <section className="d-bottom-grid">
-        <div className="surface d-dividend-card"><div className="d-bottom-heading"><div><span>现金流证据</span><strong>TTM 实际股息</strong></div><div className="d-dividend-total"><b>{formatMoney(analysis.modelDividendPerShare)}</b><small>/ 股 · 数据日 {analysis.dataAsOfDate ?? "—"}</small></div></div><div className="d-dividend-line"><div><span>股息模式</span><strong>{analysis.dividendModeCode ?? "—"}</strong><small>后端规范化结果</small></div><div><span>可靠性</span><strong>{analysis.dividendReliabilityCode}</strong><small>不使用缺失数据补齐</small></div><div><span>模型状态</span><strong>{analysis.modelStatusCode}</strong><small>来源于当前分析</small></div></div></div>
+        <div className="surface d-dividend-card"><div className="d-bottom-heading"><div><span>现金流证据</span><strong>最近 12 个月实际股息</strong></div><div className="d-dividend-total"><b>{formatMoney(analysis.modelDividendPerShare)}</b><small>/ 股 · 数据日 {analysis.dataAsOfDate ?? "—"}</small></div></div><div className="d-dividend-line"><div><span>股息模式</span><strong>{analysis.dividendModeCode ?? "—"}</strong><small>系统整理方式</small></div><div><span>资料可靠性</span><strong>{analysis.dividendReliabilityCode}</strong><small>不使用缺失数据补齐</small></div><div><span>计算状态</span><strong>{analysis.modelStatusCode}</strong><small>来源于当前分析</small></div></div></div>
         <div className="d-trust-note"><ShieldCheck size={20} /><div><strong>这是一份带日期的交易参考</strong><p>如果实际股息资料缺失，系统不会生成买入信号。请结合自己的判断。</p></div></div>
       </section>
     </>
