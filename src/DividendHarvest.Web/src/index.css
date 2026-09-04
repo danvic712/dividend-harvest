@@ -527,3 +527,32 @@ button { cursor: pointer; }
   .d-pending-next, .d-pending-budget { padding-inline: 19px; }
   .d-pending-actions { display: grid; }
 }
+
+/* Overview is a working screen: keep the hierarchy clear and the surfaces steady. */
+.app-frame-overview::before { display: none; }
+.app-frame-overview::after { top: 180px; right: -250px; width: 430px; height: 430px; opacity: .22; }
+.overview-page .d-breadcrumb { margin-bottom: 22px; }
+.overview-page .d-kicker { letter-spacing: .11em; }
+.overview-page .d-stock-identity { margin-top: 21px; }
+.overview-page .d-hero { grid-template-columns: minmax(0, 1.08fr) minmax(340px, .92fr); gap: clamp(32px, 5vw, 86px); min-height: 350px; padding: 28px 0 38px; }
+.overview-page .d-story h1 { margin: 19px 0 14px; font-size: clamp(48px, 4.8vw, 70px); letter-spacing: -.065em; line-height: 1; }
+.overview-page .d-hero-copy { max-width: 540px; font-size: 14px; line-height: 1.75; }
+.overview-page .d-action-row { margin-top: 24px; }
+.overview-page .d-signal-card { padding: 24px 25px 22px; border-radius: 10px; box-shadow: 0 12px 30px color-mix(in srgb, var(--foreground) 8%, transparent); backdrop-filter: none; transform: none; }
+.overview-page .d-pending-card { border-left: 3px solid var(--attention); }
+.overview-page .d-pending-grid { margin-top: 8px; }
+.overview-page .d-pending-next, .overview-page .d-pending-budget { padding-block: 20px 22px; }
+.overview-page .d-pending-budget { min-height: 136px; }
+.overview-page .d-ladder-section { padding-top: 32px; }
+
+@media (max-width: 1100px) {
+  .overview-page .d-hero { grid-template-columns: 1fr; gap: 30px; min-height: 0; padding: 28px 0 40px; }
+  .overview-page .d-signal-card { max-width: 700px; }
+}
+
+@media (max-width: 760px) {
+  .overview-page .d-breadcrumb { margin-bottom: 18px; }
+  .overview-page .d-hero { padding: 32px 0 36px; }
+  .overview-page .d-story h1 { font-size: 54px; }
+  .overview-page .d-hero-copy { font-size: 13px; }
+}

@@ -32,7 +32,7 @@ export function AppShell({ children, currentPath, onNavigate, lastUpdated, dataS
     setLocale(nextLocale)
   }
   return (
-    <div className="app-frame">
+    <div className={cn("app-frame", currentPath === "/overview" && "app-frame-overview")}>
       <header className="topbar d-header">
         <button className="brand-lockup" type="button" onClick={() => onNavigate("/overview")} aria-label="返回今日决策">
           <span className="brand-mark">D</span>
