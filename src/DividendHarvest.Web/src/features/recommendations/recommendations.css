@@ -585,6 +585,8 @@
   .overview-page .d-watchlist {
     display: block;
     min-height: 0;
+    padding-top: 18px;
+    padding-bottom: 18px;
   }
 
   .overview-page .d-watchlist-heading {
@@ -595,8 +597,8 @@
     display: flex;
     align-items: stretch;
     gap: 10px;
-    margin: 16px -7px 0;
-    padding: 7px;
+    margin: 13px -5px 0;
+    padding: 4px 5px 7px;
   }
 
   .overview-page .d-stock-tile {
@@ -610,6 +612,158 @@
   }
 
   .overview-page .d-action-row { --action-control-height: 56px; }
+}
+
+/* Overview polish pass: keep the single-stock state compact and the workflow readable. */
+.overview-page .d-watchlist {
+  min-height: 128px;
+  padding: 20px 22px 19px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 8%, transparent), 0 14px 32px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.overview-page .d-watchlist-heading h2 {
+  font-size: clamp(22px, 2.1vw, 27px);
+  line-height: 1.12;
+}
+
+.overview-page .d-watchlist-note strong {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.overview-page .d-watchlist-note small {
+  line-height: 1.45;
+}
+
+.overview-page .d-stock-tile {
+  min-height: 82px;
+  padding: 10px 11px;
+  border-radius: 15px;
+}
+
+.overview-page .d-stock-tile-active {
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent-strong) 18%, transparent);
+}
+
+.overview-page .d-pending-workspace {
+  margin-top: 16px;
+  padding-bottom: 19px;
+  border-radius: 24px;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--accent) 8%, transparent), 0 18px 38px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.overview-page .d-pending-workspace-head {
+  padding-top: 16px;
+  padding-bottom: 10px;
+}
+
+.overview-page .d-pending-hero {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.overview-page .d-pending-status-list {
+  gap: 8px;
+  margin-top: 15px;
+  padding: 13px 0 14px;
+}
+
+.overview-page .d-signal-card {
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 8%, transparent), 0 12px 26px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.overview-page .d-pending-next,
+.overview-page .d-pending-budget {
+  border-radius: 19px;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+@media (max-width: 1100px) {
+  .overview-page .d-watchlist { min-height: 0; }
+  .overview-page .d-pending-hero { padding-top: 22px; padding-bottom: 22px; }
+}
+
+@media (max-width: 760px) {
+  .overview-page .d-watchlist {
+    padding: 17px 15px 18px;
+    border-radius: 20px;
+  }
+
+  .overview-page .d-watchlist-heading h2 {
+    font-size: 23px;
+  }
+
+  .overview-page .d-stock-tile {
+    min-height: 78px;
+  }
+
+  .overview-page .d-pending-workspace {
+    margin-top: 13px;
+    padding-inline: 15px;
+    padding-bottom: 15px;
+    border-radius: 20px;
+  }
+
+  .overview-page .d-pending-workspace-head {
+    padding-top: 14px;
+    padding-bottom: 9px;
+  }
+
+  .overview-page .d-pending-hero {
+    gap: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .overview-page .d-story-title {
+    max-width: 10em;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    font-size: clamp(36px, 8.7vw, 46px);
+    line-height: 1.04;
+  }
+
+  .overview-page .d-hero-copy {
+    font-size: 12px;
+    line-height: 1.68;
+  }
+
+  .overview-page .d-action-row {
+    gap: 9px;
+    margin-top: 18px;
+  }
+
+  .overview-page .d-action-amount,
+  .overview-page .d-primary-button {
+    height: 52px;
+    min-height: 52px;
+  }
+
+  .overview-page .d-signal-card {
+    padding: 18px 17px 16px;
+    border-radius: 18px;
+  }
+
+  .overview-page .d-signal-card h2 {
+    font-size: 20px;
+  }
+
+  .overview-page .d-pending-next,
+  .overview-page .d-pending-budget {
+    padding: 18px 17px 19px;
+    border-radius: 18px;
+  }
+
+  .overview-page .d-pending-budget {
+    min-height: 122px;
+  }
+
+  .overview-page .d-pending-budget strong {
+    margin: 6px 0 3px;
+    font-size: 27px;
+  }
 }
 
 /* Notebook masthead and progress rail: add character without hiding the next action. */

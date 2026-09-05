@@ -1,8 +1,10 @@
 import { Languages, Monitor, Moon, Settings2, Sun, SunMoon } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 
 import { useTheme, type Theme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLocale } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { siteNavigation } from "@/components/site-navigation"
@@ -16,38 +18,14 @@ export function SiteHeader({ currentPath, onNavigate }: SiteHeaderProps) {
   const { theme, setTheme } = useTheme()
   const { locale, setLocale, messages } = useLocale()
   const [preferencesOpen, setPreferencesOpen] = useState(false)
-  const preferencesRef = useRef<HTMLDivElement>(null)
   const themeOptions = [
     { value: "light" as Theme, label: messages.common.ui.theme.light, icon: Sun },
     { value: "dark" as Theme, label: messages.common.ui.theme.dark, icon: Moon },
     { value: "system" as Theme, label: messages.common.ui.theme.system, icon: Monitor },
   ]
 
-  useEffect(() => {
-    if (!preferencesOpen) {
-      return undefined
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (preferencesRef.current && !preferencesRef.current.contains(event.target as Node)) {
-        setPreferencesOpen(false)
-      }
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setPreferencesOpen(false)
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown)
-    document.addEventListener("keydown", handleKeyDown)
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown)
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [preferencesOpen])
-
-  const handleMobileLocaleChange = (value: typeof locale) => {
+  const handleLocaleChange = (value: string | null) => {
+    if (value !== "zh-CN" && value !== "en-US") return
     setLocale(value)
     setPreferencesOpen(false)
   }
@@ -80,26 +58,27 @@ export function SiteHeader({ currentPath, onNavigate }: SiteHeaderProps) {
         </nav>
 
         <div className="topbar-actions d-header-actions">
-          <div className="theme-control" aria-label={messages.common.ui.theme.label}>
+          <div className="theme-control" role="group" aria-label={messages.common.ui.theme.label}>
             <SunMoon className="preference-icon" aria-hidden="true" />
-            {themeOptions.map((option) => { const Icon = option.icon; return <Button key={option.value} variant="ghost" size="sm" type="button" aria-pressed={theme === option.value} className={theme === option.value ? "theme-control-active" : ""} onClick={() => setTheme(option.value)}><Icon className="theme-option-icon" aria-hidden="true" /><span className="theme-option-label">{option.label}</span></Button> })}
+            {themeOptions.map((option) => { const Icon = option.icon; return <Button key={option.value} variant="ghost" size="sm" type="button" aria-pressed={theme === option.value} className={cn(theme === option.value && "theme-control-active")} onClick={() => setTheme(option.value)}><Icon data-icon="inline-start" className="theme-option-icon" aria-hidden="true" /><span className="theme-option-label">{option.label}</span></Button> })}
           </div>
-          <div className="locale-control" aria-label={messages.common.ui.language.label}><Languages size={14} /><select value={locale} onChange={(event) => setLocale(event.target.value as typeof locale)} aria-label={messages.common.ui.language.select}><option value="zh-CN">{messages.common.ui.language.zhCN}</option><option value="en-US">{messages.common.ui.language.enUS}</option></select></div>
-          <div className="mobile-preferences" ref={preferencesRef}>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="mobile-preferences-trigger"
-              type="button"
-              aria-label={`${messages.common.ui.theme.label} / ${messages.common.ui.language.label}`}
-              aria-expanded={preferencesOpen}
-              aria-controls="mobile-preferences-panel"
-              onClick={() => setPreferencesOpen((open) => !open)}
-            >
-              <SunMoon />
-            </Button>
-            {preferencesOpen ? (
-              <div id="mobile-preferences-panel" className="mobile-preferences-panel" role="dialog" aria-label={`${messages.common.ui.theme.label} / ${messages.common.ui.language.label}`}>
+          <div className="locale-control" aria-label={messages.common.ui.language.label}>
+            <Select value={locale} onValueChange={handleLocaleChange}>
+              <SelectTrigger size="sm" className="locale-select-trigger" aria-label={messages.common.ui.language.select}>
+                <Languages className="locale-select-leading" aria-hidden="true" />
+                <SelectValue>{locale === "zh-CN" ? messages.common.ui.language.zhCN : messages.common.ui.language.enUS}</SelectValue>
+              </SelectTrigger>
+              <SelectContent align="end"><SelectGroup><SelectItem value="zh-CN">{messages.common.ui.language.zhCN}</SelectItem><SelectItem value="en-US">{messages.common.ui.language.enUS}</SelectItem></SelectGroup></SelectContent>
+            </Select>
+          </div>
+          <div className="mobile-preferences">
+            <Popover open={preferencesOpen} onOpenChange={setPreferencesOpen}>
+              <PopoverTrigger render={<Button size="icon" variant="ghost" className="mobile-preferences-trigger" aria-label={`${messages.common.ui.theme.label} / ${messages.common.ui.language.label}`}><SunMoon aria-hidden="true" /></Button>} />
+              <PopoverContent align="end" className="mobile-preferences-panel">
+                <PopoverHeader className="mobile-preferences-header">
+                  <PopoverTitle>{messages.common.ui.preferences.label}</PopoverTitle>
+                  <PopoverDescription>{messages.common.ui.preferences.description}</PopoverDescription>
+                </PopoverHeader>
                 <div className="mobile-preferences-section">
                   <span>{messages.common.ui.theme.label}</span>
                   <div className="mobile-theme-options">
@@ -115,10 +94,9 @@ export function SiteHeader({ currentPath, onNavigate }: SiteHeaderProps) {
                           className={cn("mobile-theme-option", theme === option.value && "mobile-theme-option-active")}
                           onClick={() => {
                             setTheme(option.value)
-                            setPreferencesOpen(false)
                           }}
                         >
-                          <Icon aria-hidden="true" />
+                          <Icon data-icon="inline-start" aria-hidden="true" />
                           <span>{option.label}</span>
                         </Button>
                       )
@@ -127,19 +105,19 @@ export function SiteHeader({ currentPath, onNavigate }: SiteHeaderProps) {
                 </div>
                 <div className="mobile-preferences-section">
                   <span>{messages.common.ui.language.label}</span>
-                  <label className="mobile-preferences-locale">
-                    <Languages size={15} aria-hidden="true" />
-                    <select value={locale} onChange={(event) => handleMobileLocaleChange(event.target.value as typeof locale)} aria-label={messages.common.ui.language.select}>
-                      <option value="zh-CN">{messages.common.ui.language.zhCN}</option>
-                      <option value="en-US">{messages.common.ui.language.enUS}</option>
-                    </select>
-                  </label>
+                  <Select value={locale} onValueChange={handleLocaleChange}>
+                    <SelectTrigger size="sm" className="mobile-preferences-locale" aria-label={messages.common.ui.language.select}>
+                      <Languages className="locale-select-leading" aria-hidden="true" />
+                      <SelectValue>{locale === "zh-CN" ? messages.common.ui.language.zhCN : messages.common.ui.language.enUS}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent align="end"><SelectGroup><SelectItem value="zh-CN">{messages.common.ui.language.zhCN}</SelectItem><SelectItem value="en-US">{messages.common.ui.language.enUS}</SelectItem></SelectGroup></SelectContent>
+                  </Select>
                 </div>
-              </div>
-            ) : null}
+              </PopoverContent>
+            </Popover>
           </div>
           <Button size="icon" variant="ghost" className="header-settings-button" aria-label={messages.common.ui.settings} onClick={() => onNavigate("/settings")}>
-            <Settings2 />
+            <Settings2 data-icon="inline-start" />
           </Button>
         </div>
       </header>

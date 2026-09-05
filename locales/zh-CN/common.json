@@ -30,6 +30,10 @@
       "dark": "夜间",
       "system": "系统"
     },
+    "preferences": {
+      "label": "显示与语言",
+      "description": "选择你习惯的显示方式。"
+    },
     "language": {
       "label": "语言设置",
       "select": "选择语言",

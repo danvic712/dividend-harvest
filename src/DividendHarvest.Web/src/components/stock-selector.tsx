@@ -31,7 +31,15 @@ export function StockSelector({ stocks, selectedKey, onSelect, recommendations =
         const stockName = displayStockName(stock)
         const initials = stockName.slice(0, 2)
         return (
-          <Button key={`${stock.securityCode}-${stock.exchangeCode}`} variant="ghost" className={cn("d-stock-tile", selected && "d-stock-tile-active")} type="button" onClick={() => onSelect(stock)} aria-pressed={selected}>
+          <Button
+            key={`${stock.securityCode}-${stock.exchangeCode}`}
+            variant="ghost"
+            className={cn("d-stock-tile", selected && "d-stock-tile-active")}
+            type="button"
+            onClick={() => onSelect(stock)}
+            aria-pressed={selected}
+            aria-label={`${stockName} ${stock.securityCode}.${stock.exchangeCode} · ${statusLabel}`}
+          >
             <span className={cn("d-tile-avatar", `d-tile-${statusTone}`)}>{initials}</span>
             <span className="d-tile-name"><strong>{stockName}</strong><span>{stock.securityCode}.{stock.exchangeCode}</span></span>
             <span className="d-tile-quote"><strong>{recommendation?.analysis.closePrice === null || recommendation?.analysis.closePrice === undefined ? "—" : `¥${recommendation.analysis.closePrice.toFixed(2)}`}</strong><span>{stock.sectorCode ?? labels?.sectorUnset ?? "行业未设置"}</span></span>

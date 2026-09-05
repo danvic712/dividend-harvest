@@ -2,8 +2,10 @@ import { createContext, createElement, useContext, useMemo, useState, type React
 
 import enCommon from "../../../../locales/en-US/common.json"
 import enDividendStrategy from "../../../../locales/en-US/dividend-strategy.json"
+import enSetup from "../../../../locales/en-US/setup.json"
 import zhCommon from "../../../../locales/zh-CN/common.json"
 import zhDividendStrategy from "../../../../locales/zh-CN/dividend-strategy.json"
+import zhSetup from "../../../../locales/zh-CN/setup.json"
 
 export type Locale = "zh-CN" | "en-US"
 
@@ -12,16 +14,21 @@ type LocaleMessages = {
   dividendStrategy: {
     ui: typeof zhDividendStrategy.ui
   }
+  setup: {
+    ui: typeof zhSetup.ui
+  }
 }
 
 const catalogs: Record<Locale, LocaleMessages> = {
   "zh-CN": {
     common: zhCommon,
     dividendStrategy: { ui: zhDividendStrategy.ui },
+    setup: { ui: zhSetup.ui },
   },
   "en-US": {
     common: enCommon,
     dividendStrategy: { ui: enDividendStrategy.ui },
+    setup: { ui: enSetup.ui },
   },
 }
 

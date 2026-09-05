@@ -30,6 +30,10 @@
       "dark": "Dark",
       "system": "System"
     },
+    "preferences": {
+      "label": "Display and language",
+      "description": "Choose how Dividend Harvest should look."
+    },
     "language": {
       "label": "Language",
       "select": "Select language",
