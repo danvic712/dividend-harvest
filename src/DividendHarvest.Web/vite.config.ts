@@ -16,6 +16,9 @@ export default defineConfig({
   },
   server: {
     port: 4173,
+    fs: {
+      allow: [path.resolve(import.meta.dirname), path.resolve(import.meta.dirname, "../../locales")],
+    },
     proxy: {
       "/api": "http://127.0.0.1:5050",
       "/healthz": "http://127.0.0.1:5050",

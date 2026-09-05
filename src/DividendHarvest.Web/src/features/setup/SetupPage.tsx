@@ -71,7 +71,7 @@ export function SetupPage({ onComplete }: { onComplete: (result: SetupResult) =>
         <section className="setup-intro">
           <p className="eyebrow">FIRST RUN / PERSONAL WORKSPACE</p>
           <h1 className="setup-title">先把你的<br />组合放进来。</h1>
-          <p>输入需要跟踪的 A 股股票。系统会从 FTShare 同步股票资料、价格、股息和财务快照，再根据每只股票的模型参数给出可解释的交易参考。</p>
+          <p>输入需要跟踪的 A 股股票。系统会同步股票资料、价格、股息和财务快照，再根据每只股票的模型参数给出可解释的交易参考。</p>
           <div className="setup-callout"><span>01</span><span>{copy.disclaimer}</span></div>
         </section>
 
@@ -94,7 +94,7 @@ export function SetupPage({ onComplete }: { onComplete: (result: SetupResult) =>
             <Button className="form-grid-wide" variant="outline" onClick={addStock}><Plus data-icon="inline-start" />继续添加股票</Button>
             <div className="form-actions"><Button size="lg" onClick={submit} disabled={submitting}>{submitting ? "正在建立…" : "建立我的组合"}</Button><span className="form-message">组合会先立即建立；股票名称、行情和股息资料将在后台同步，不会阻塞进入系统。</span></div>
           </div>
-          <p className="setup-footnote">股票代码仅支持 6 位数字；交易所用于区分同代码证券。该页面不会接收或保存 FTShare 密钥。</p>
+          <p className="setup-footnote">股票代码仅支持 6 位数字；交易所用于区分同代码证券。该页面不会接收或保存任何数据服务密钥。</p>
         </section>
       </div>
     </main>

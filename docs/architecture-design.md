@@ -40,7 +40,7 @@ ASP.NET Core 默认环境名为 `Production`（大小写不敏感）时，会自
 
 ## 3.1 多语言资源
 
-根目录 `locales/` 是跨层共享的文本资源源文件，当前包含 `zh-CN` 和 `en-US` 两个语言目录；每个语言目录按业务领域拆分为 `common.json`、`setup.json`、`stocks.json`、`portfolio.json` 和 `dividend-strategy.json`。异常定义使用稳定的 `error_code` 作为 JSON 键，并支持由 Application 异常提供的命名参数插值。错误目录只负责错误定义和文本资源，语言选择、参数插值与 HTTP 展示由独立的 `IApplicationErrorLocalizer` 负责。
+根目录 `locales/` 是跨层共享的文本资源源文件，当前包含 `zh-CN` 和 `en-US` 两个语言目录；每个语言目录按业务领域拆分为 `common.json`、`setup.json`、`stocks.json`、`portfolio.json` 和 `dividend-strategy.json`。异常定义使用稳定的 `error_code` 作为 JSON 键，并支持由 Application 异常提供的命名参数插值。业务领域 JSON 可以同时包含保留的 `ui` 节点，供前端页面读取产品文案；Application 异常目录加载器只读取顶层错误定义并显式忽略 `ui` 节点，避免前端文案改变异常目录语义。语言选择、参数插值与 HTTP 展示由独立的 `IApplicationErrorLocalizer` 负责。
 
 Application 项目通过 `EmbeddedResource` 将根目录 `locales/**/*.json` 编译嵌入 `DividendHarvest.Application.dll`。运行时只从程序集资源读取文本，不读取可被容器或请求任意替换的本地文件。Host 的统一异常处理器根据请求的 `Accept-Language` 及其 `q` 权重选择语言，返回 canonical culture name；不支持、质量为 0 或缺失时回退到 `zh-CN`，并在 ProblemDetails 扩展中返回实际使用的 `locale`。后台同步等非 HTTP 入口使用默认语言。
 
@@ -167,11 +167,19 @@ src/
     └── wwwroot/                        # 前端构建产物（由 DividendHarvest.Web 构建写入）
 └── DividendHarvest.Web/                # Vite + React + shadcn/ui 前端源码
 │   ├── src/features/                   # 每个 feature 自有页面、组件、API、CSS
-│   ├── src/components/ui/              # shadcn/ui 源码组件
+│   ├── src/components/                 # 跨页面的公共组合组件
+│   │   ├── site-header.tsx             # 公共顶部导航与主题/语言操作
+│   │   ├── site-footer.tsx             # 公共页脚与数据口径提示
+│   │   ├── page-frame.tsx              # 页面级公共布局组合
+│   │   ├── page-heading.tsx            # 页面标题与区块标题
+│   │   ├── site-navigation.ts          # 公共导航配置
+│   │   └── ui/                         # shadcn/ui 源码组件
 │   └── src/lib/                        # Axios client、DTO 类型和共享展示工具
 ```
 
 Application 的业务实现按业务能力归并到 `Setup`、`Stocks`、`Portfolio` 和 `DividendStrategy` 四个目录。目录归并不等于合并 HTTP 契约：价格、股息和财务同步仍然保持独立的 Interface 与 AppService，因为它们具有不同的数据校验、幂等键和结果类型；资料、行情、股息和财务四类事实的共同摄取、Security 解析、FTShare 调用、幂等写入和逐类失败策略由 `IStockFactSyncAppService` / `StockFactSyncAppService` 这个深模块承载，三个 HTTP AppService 只是验证后转发。单股分析、组合分配和建议快照也保持独立的用例边界。`Contracts`、`Dtos`、`Exceptions` 和 `Validators` 继续作为 Application 根目录的规范容器，不在每个业务目录下重复创建，避免物理目录再次膨胀。前端按相同的业务边界拆分 feature，但只通过版本化 HTTP API 访问后端，不直接引用 Application 或 Infrastructure。
+
+前端公共页面框架由 `SiteHeader`、`SiteFooter`、`PageFrame`、`PageTitle`、`SectionHeading` 和 `site-navigation` 组成，禁止使用 `app-shell` 作为公共组件名称；所有页面通过 `PageFrame` 复用框架，页面专属状态与布局留在对应 feature。`index.css` 只承载 token、reset 和跨页面共享原子样式；今日决策页的布局、等待态、就绪态、骨架屏、装饰和响应式样式统一位于 `features/recommendations/recommendations.css`。交互控件优先使用 `src/components/ui` 中的 shadcn/ui 原语，feature 样式只负责业务变体与布局。
 
 前端使用 Node `24.16.0` 与 pnpm `11.19.0` 构建静态资源，输出到 Host 的 `wwwroot/`；该目录是构建产物并保持本地生成，不提交源代码仓库。根目录 `Dockerfile` 使用 Node Alpine、.NET SDK Alpine 和 ASP.NET Core Alpine 三阶段构建：前两阶段只负责编译，最终镜像只保留 .NET publish 输出，因此不会携带 Node、pnpm、源码或测试依赖。单镜像构建流程必须先完成前端构建，再执行 ASP.NET Core publish；开发预览使用 Vite proxy 将 `/api` 转发到本地 Host。
 

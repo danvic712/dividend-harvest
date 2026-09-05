@@ -1,7 +1,8 @@
 import { Save } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 
-import { AppShell, PageTitle } from "@/components/app-shell"
+import { PageFrame } from "@/components/page-frame"
+import { PageTitle } from "@/components/page-heading"
 import { EmptyState, ErrorState, LoadingState } from "@/components/async-state"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -109,17 +110,17 @@ export function SettingsPage({ onNavigate }: { onNavigate: (path: string) => voi
     }
   }
 
-  if (loading) return <div className="page-wrap"><LoadingState label="正在读取模型设置…" /></div>
-  if (error && !stocks.length) return <div className="page-wrap"><ErrorState message={error} onRetry={() => window.location.reload()} /></div>
-  if (!stocks.length) return <div className="page-wrap"><EmptyState title="还没有股票资料" description="完成首次设置后，才能按股票配置模型参数。" action={<Button onClick={() => onNavigate("/setup")}>去建立组合</Button>} /></div>
+  if (loading) return <PageFrame currentPath="/settings" onNavigate={onNavigate} dataState="pending"><LoadingState label="正在读取模型设置…" /></PageFrame>
+  if (error && !stocks.length) return <PageFrame currentPath="/settings" onNavigate={onNavigate} dataState="unknown"><ErrorState message={error} onRetry={() => window.location.reload()} /></PageFrame>
+  if (!stocks.length) return <PageFrame currentPath="/settings" onNavigate={onNavigate} dataState="unknown"><EmptyState title="还没有股票资料" description="完成首次设置后，才能按股票配置模型参数。" action={<Button onClick={() => onNavigate("/setup")}>去建立组合</Button>} /></PageFrame>
 
   return (
-    <AppShell currentPath="/settings" onNavigate={onNavigate} dataState="unknown">
+    <PageFrame currentPath="/settings" onNavigate={onNavigate} dataState="unknown">
       <PageTitle eyebrow="SETTINGS / PER-STOCK MODEL" title="每只股票，自己的边界。" description="这些参数由后端验证并保存；比例使用 0 到 1 的小数表达，例如 0.25 表示 25%。" actions={<Button onClick={() => void save()} disabled={!parameters || saving}><Save data-icon="inline-start" />{saving ? "保存中…" : "保存参数"}</Button>} />
       {error && <Alert variant="destructive" style={{ marginBottom: 16 }}><AlertTitle>设置提醒</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
       {message && <Alert style={{ marginBottom: 16 }}><AlertTitle>已完成</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
-      <section className="surface settings-card"><div className="settings-stock-tabs" role="tablist" aria-label="选择股票参数"><span className="eyebrow" style={{ alignSelf: "center", margin: "0 8px 0 0", whiteSpace: "nowrap" }}>SELECT STOCK</span>{stocks.map((stock) => <button key={stockKey(stock)} className={`settings-stock-tab ${selectedKey === stockKey(stock) ? "settings-stock-tab-active" : ""}`} type="button" onClick={() => setSelectedKey(stockKey(stock))} role="tab" aria-selected={selectedKey === stockKey(stock)}>{stock.securityCode} · {stock.exchangeCode} · {displayStockName(stock)}</button>)}</div>{parameters ? <div className="form-grid"><div className="field"><label htmlFor="model-version">模型版本</label><Input id="model-version" value={parameters.modelVersion} onChange={(event) => updateValue("modelVersion", event.target.value)} /></div><div className="field"><label htmlFor="effective-date">生效日期</label><Input id="effective-date" type="date" value={parameters.effectiveFromDate || today()} onChange={(event) => updateValue("effectiveFromDate", event.target.value)} /></div><ParameterGroup title="收益率阈值" fields={thresholdFields} parameters={parameters} onChange={updateValue} percent /><ParameterGroup title="预算与仓位比例" fields={ratioFields} parameters={parameters} onChange={updateValue} percent /><ParameterGroup title="交易限制" fields={limitFields} parameters={parameters} onChange={updateValue} /></div> : <EmptyState title="这只股票还没有模型参数" description="请先通过后端初始化或导入模型参数；当前页面不会用默认值覆盖你的模型设置。" />}</section>
-    </AppShell>
+      <section className="surface settings-card"><div className="settings-stock-tabs" role="tablist" aria-label="选择股票参数"><span className="eyebrow" style={{ alignSelf: "center", margin: "0 8px 0 0", whiteSpace: "nowrap" }}>SELECT STOCK</span>{stocks.map((stock) => <Button key={stockKey(stock)} variant="ghost" className={`settings-stock-tab ${selectedKey === stockKey(stock) ? "settings-stock-tab-active" : ""}`} type="button" onClick={() => setSelectedKey(stockKey(stock))} role="tab" aria-selected={selectedKey === stockKey(stock)}>{stock.securityCode} · {stock.exchangeCode} · {displayStockName(stock)}</Button>)}</div>{parameters ? <div className="form-grid"><div className="field"><label htmlFor="model-version">模型版本</label><Input id="model-version" value={parameters.modelVersion} onChange={(event) => updateValue("modelVersion", event.target.value)} /></div><div className="field"><label htmlFor="effective-date">生效日期</label><Input id="effective-date" type="date" value={parameters.effectiveFromDate || today()} onChange={(event) => updateValue("effectiveFromDate", event.target.value)} /></div><ParameterGroup title="收益率阈值" fields={thresholdFields} parameters={parameters} onChange={updateValue} percent /><ParameterGroup title="预算与仓位比例" fields={ratioFields} parameters={parameters} onChange={updateValue} percent /><ParameterGroup title="交易限制" fields={limitFields} parameters={parameters} onChange={updateValue} /></div> : <EmptyState title="这只股票还没有模型参数" description="请先通过后端初始化或导入模型参数；当前页面不会用默认值覆盖你的模型设置。" />}</section>
+    </PageFrame>
   )
 }
 

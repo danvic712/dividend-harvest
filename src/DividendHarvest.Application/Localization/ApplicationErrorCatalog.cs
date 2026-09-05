@@ -9,6 +9,7 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
 {
     private const string ResourceMarker = ".locales.";
     private const string JsonSuffix = ".json";
+    private const string UiPropertyName = "ui";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -64,10 +65,25 @@ public sealed class ApplicationErrorCatalog : IApplicationErrorCatalog
                     $"Embedded application locale resource '{resourceName}' could not be opened.");
             using var document = JsonDocument.Parse(stream);
             EnsureNoDuplicateProperties(document.RootElement, resourceName);
-            var domainDefinitions = document.RootElement.Deserialize<
-                Dictionary<string, ApplicationErrorDefinition>>(JsonOptions)
-                ?? throw new InvalidOperationException(
+            var domainDefinitions = new Dictionary<string, ApplicationErrorDefinition>(StringComparer.Ordinal);
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.NameEquals(UiPropertyName))
+                {
+                    continue;
+                }
+
+                var definition = property.Value.Deserialize<ApplicationErrorDefinition>(JsonOptions)
+                    ?? throw new InvalidOperationException(
+                        $"Embedded application locale resource '{resourceName}' contains an empty definition for '{property.Name}'.");
+                domainDefinitions.Add(property.Name, definition);
+            }
+
+            if (domainDefinitions.Count == 0)
+            {
+                throw new InvalidOperationException(
                     $"Embedded application locale resource '{resourceName}' is empty.");
+            }
 
             if (!cultures.TryGetValue(cultureName, out var cultureDefinitions))
             {

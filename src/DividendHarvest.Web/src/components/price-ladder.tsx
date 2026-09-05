@@ -1,14 +1,17 @@
 import type { StockAnalysisResult } from "@/lib/api-types"
+import { interpolate, useLocale } from "@/lib/i18n"
 import { getPriceZones } from "@/lib/price-zones"
 import { displayStockName } from "@/lib/stock-display"
 import { formatMoney } from "@/lib/utils"
 
 export function PriceLadder({ analysis, compact = false }: { analysis: StockAnalysisResult; compact?: boolean }) {
-  const zones = getPriceZones(analysis)
+  const { messages } = useLocale()
+  const copy = messages.dividendStrategy.ui.overview.decision
+  const zones = getPriceZones(analysis, copy.priceZoneDetails)
   const validPrices = [analysis.strongBuyPrice, analysis.accumulatePrice, analysis.partialTrimPrice, analysis.aggressiveTrimPrice]
 
   if (validPrices.some((price) => price === null || price <= 0)) {
-    return <div className={`d-ladder-unavailable ${compact ? "d-ladder-unavailable-compact" : ""}`}><span>价格阶梯等待资料</span><small>完整同步 TTM 实际股息和行情后，系统会计算五档参考区间。</small></div>
+    return <div className={`d-ladder-unavailable ${compact ? "d-ladder-unavailable-compact" : ""}`}><span>{copy.priceLadderPendingTitle}</span><small>{copy.priceLadderPendingDescription}</small></div>
   }
 
   const [strongBuy, accumulate, partialTrim, aggressiveTrim] = validPrices as number[]
@@ -24,7 +27,7 @@ export function PriceLadder({ analysis, compact = false }: { analysis: StockAnal
       <div className="ladder-axis" aria-hidden="true">
         {boundaries.map((value) => <span key={value}>{formatMoney(value)}</span>)}
       </div>
-      <div className="ladder-track" aria-label={`${displayStockName(analysis)}价格阶梯`}>
+      <div className="ladder-track" aria-label={interpolate(copy.ladderAriaLabel, { stockName: displayStockName(analysis) })}>
         {zones.map((zone, index) => <div className={`ladder-zone ${zone.className}`} key={zone.code} style={{ flex: boundaries[index + 1] - boundaries[index] }}><span>{zone.label}</span></div>)}
         <div className="current-price-marker" style={{ left: `${markerPosition}%` }}><span>{formatMoney(analysis.closePrice)}</span><i /></div>
       </div>
@@ -34,5 +37,7 @@ export function PriceLadder({ analysis, compact = false }: { analysis: StockAnal
 }
 
 export function PriceZoneBoard({ analysis }: { analysis: StockAnalysisResult }) {
-  return <div className="d-zone-grid">{getPriceZones(analysis).map((zone) => <div className={`d-zone-card ${zone.className} ${analysis.priceZoneCode === zone.code ? "d-zone-card-active" : ""}`} key={zone.code}><span>{zone.label}</span><strong>{formatMoney(zone.price)}</strong><small>{zone.copy}</small></div>)}</div>
+  const { messages } = useLocale()
+  const zones = getPriceZones(analysis, messages.dividendStrategy.ui.overview.decision.priceZoneDetails)
+  return <div className="d-zone-grid">{zones.map((zone) => <div className={`d-zone-card ${zone.className} ${analysis.priceZoneCode === zone.code ? "d-zone-card-active" : ""}`} key={zone.code}><span>{zone.label}</span><strong>{formatMoney(zone.price)}</strong><small>{zone.copy}</small></div>)}</div>
 }

@@ -1,4 +1,54 @@
 {
+  "ui": {
+    "appName": "Dividend Harvest",
+    "brandName": "Dividend Harvest",
+    "pageTitle": "Dividend Harvest · Dividend reference",
+    "appEyebrow": "DIVIDEND HARVEST / A-SHARE REFERENCE",
+    "brandCaption": "Dividend income · Long-term accumulation",
+    "backToOverview": "Back to today’s decision",
+    "mainNavigation": "Main navigation",
+    "mobileNavigation": "Mobile navigation",
+    "nav": {
+      "overview": "Today",
+      "stocks": "Stock data",
+      "budget": "Cash budget",
+      "portfolio": "Trade log",
+      "settings": "Settings"
+    },
+    "data": {
+      "referenceTitle": "Daily trading reference",
+      "synced": "Data updated",
+      "pending": "Syncing data",
+      "unknown": "Trading-day updates",
+      "tradingDay": "Trading-day refresh",
+      "everyTradingDay": "Every trading day",
+      "updatedAt": "Data updated {updatedAt}"
+    },
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "label": "Language",
+      "select": "Select language",
+      "zhCN": "中文",
+      "enUS": "EN"
+    },
+    "settings": "Open settings",
+    "scrollToTop": "Back to top",
+    "states": {
+      "readingData": "Reading data…",
+      "connecting": "Connecting to your local portfolio…",
+      "preparingSetup": "Preparing first-time setup…",
+      "setupCompleteSync": "Portfolio created. Stock data is syncing in the background.",
+      "setupCompleteDeferred": "Portfolio created. Background sync was not queued; it will retry on the next manual or trading-day sync."
+    },
+    "disclaimer": "For personal research and simulated records only. Not investment advice and never places orders automatically.",
+    "researchOnly": "Research only",
+    "aShareOnly": "A-shares only"
+  },
   "application_error_unknown": {
     "status_code": 500,
     "title": "The request could not be processed",

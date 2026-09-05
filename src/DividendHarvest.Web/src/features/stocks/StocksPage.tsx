@@ -1,7 +1,8 @@
 import { Database, RefreshCw } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 
-import { AppShell, PageTitle, SectionHeading } from "@/components/app-shell"
+import { PageFrame } from "@/components/page-frame"
+import { PageTitle, SectionHeading } from "@/components/page-heading"
 import { EmptyState, ErrorState, LoadingState } from "@/components/async-state"
 import { PriceLadder, PriceZoneBoard } from "@/components/price-ladder"
 import { StockSelector } from "@/components/stock-selector"
@@ -95,15 +96,15 @@ export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void 
     }
   }
 
-  if (loading) return <div className="page-wrap"><LoadingState label="正在读取股票资料…" /></div>
-  if (error && !stocks.length) return <div className="page-wrap"><ErrorState message={error} onRetry={() => void loadStocks()} /></div>
-  if (!stocks.length) return <div className="page-wrap"><EmptyState title="还没有股票资料" description="完成首次设置后，这里会展示每只股票的资料、持仓和模型参数。" action={<Button onClick={() => onNavigate("/setup")}>去建立组合</Button>} /></div>
+  if (loading) return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="pending"><LoadingState label="正在读取股票资料…" /></PageFrame>
+  if (error && !stocks.length) return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="unknown"><ErrorState message={error} onRetry={() => void loadStocks()} /></PageFrame>
+  if (!stocks.length) return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="unknown"><EmptyState title="还没有股票资料" description="完成首次设置后，这里会展示每只股票的资料、持仓和模型参数。" action={<Button onClick={() => onNavigate("/setup")}>去建立组合</Button>} /></PageFrame>
 
   const selectedStock = stocks.find((stock) => stockKey(stock) === selectedKey) ?? stocks[0]
   const analysisReady = hasAnalysisData(analysis)
   const lastUpdated = analysis?.computedAt ? formatDateTime(analysis.computedAt) : null
   return (
-    <AppShell currentPath="/stocks" onNavigate={onNavigate} lastUpdated={lastUpdated} dataState={analysisReady ? "synced" : "pending"}>
+    <PageFrame currentPath="/stocks" onNavigate={onNavigate} lastUpdated={lastUpdated} dataState={analysisReady ? "synced" : "pending"}>
       <PageTitle eyebrow="STOCK LIBRARY / SOURCE DATA" title="股票资料，保持可追溯。" description="每个价格、股息和财务快照都来自后端同步结果。缺失资料会明确显示，不会用前端默认值掩盖。" actions={<Button onClick={() => void syncAll()} disabled={syncing}><RefreshCw data-icon="inline-start" />{syncing ? "同步中…" : "同步全部资料"}</Button>} />
       {error && <Alert variant="destructive" className="d-inline-alert"><AlertTitle>读取提醒</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
       <div className="stocks-layout">
@@ -113,7 +114,7 @@ export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void 
         </section>
       </div>
       {syncResult && <section className="sync-results"><Alert variant={syncResult.partiallyFailedStockCount ? "attention" : "default"}><AlertTitle><Database size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />资料同步完成</AlertTitle><AlertDescription>尝试 {syncResult.attemptedStockCount} 只，完整完成 {syncResult.fullyCompletedStockCount} 只，部分失败 {syncResult.partiallyFailedStockCount} 只。{syncResult.failures.length ? `失败项 ${syncResult.failures.map((failure) => `${failure.securityCode} ${failure.dataKind}`).join("、")}。` : ""}</AlertDescription></Alert></section>}
-    </AppShell>
+    </PageFrame>
   )
 }
 
@@ -129,7 +130,7 @@ function StockDetail({ analysis, parameters, onNavigate }: { analysis: StockAnal
 
 function StockDetailPending({ stock, message, onSync }: { stock: StockWatchlistItem; message: string | null; onSync: () => void }) {
   const name = displayStockName(stock)
-  return <div className="stock-detail-pending"><div className="d-kicker"><span>01</span><span>资料读数</span><i /></div><div className="stock-detail-identity"><div className="d-stock-avatar">{name.slice(0, 2)}</div><div><h2 className="stock-detail-name">{name}</h2><p className="stock-detail-code">{stock.securityCode}.{stock.exchangeCode} · 等待 FTShare 同步</p></div></div><h3>资料还在路上。</h3><p>这只股票已经保存到你的组合。基础资料、行情、股息和财务快照完成同步后，这里会自动出现价格阶梯。</p>{message && <p className="stock-pending-message">{message}</p>}<Button variant="outline" onClick={onSync}><RefreshCw data-icon="inline-start" />重新同步</Button></div>
+  return <div className="stock-detail-pending"><div className="d-kicker"><span>01</span><span>资料读数</span><i /></div><div className="stock-detail-identity"><div className="d-stock-avatar">{name.slice(0, 2)}</div><div><h2 className="stock-detail-name">{name}</h2><p className="stock-detail-code">{stock.securityCode}.{stock.exchangeCode} · 等待资料同步</p></div></div><h3>资料还在路上。</h3><p>这只股票已经保存到你的组合。基础资料、行情、股息和财务快照完成同步后，这里会自动出现价格阶梯。</p>{message && <p className="stock-pending-message">{message}</p>}<Button variant="outline" onClick={onSync}><RefreshCw data-icon="inline-start" />重新同步</Button></div>
 }
 
 function parameterEntries(parameters: StockModelParameterSet) {

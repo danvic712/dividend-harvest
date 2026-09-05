@@ -21,35 +21,54 @@ export function recommendationTone(code: string | null | undefined): SignalTone 
   return "hold"
 }
 
-export function recommendationLabel(code: string | null | undefined) {
+export function recommendationLabel(code: string | null | undefined, labels?: Record<string, string>) {
   const normalized = code?.toLowerCase() ?? ""
-  if (normalized === "strong_buy") return "强买入"
-  if (normalized === "accumulate") return "分批加仓"
-  if (normalized === "partial_trim") return "减仓候选"
-  if (normalized === "aggressive_trim") return "激进减仓"
-  if (normalized === "re_evaluate") return "需要复核"
-  if (normalized === "no_action" || normalized === "hold") return "暂不操作"
-  return "等待数据"
+  const labelKey = ({
+    strong_buy: "strongBuy",
+    accumulate: "accumulate",
+    partial_trim: "partialTrim",
+    aggressive_trim: "aggressiveTrim",
+    re_evaluate: "reEvaluate",
+    no_action: "hold",
+    hold: "hold",
+  } as Record<string, string>)[normalized] ?? "unknown"
+  return labels?.[labelKey] ?? ({
+    strongBuy: "强买入",
+    accumulate: "分批加仓",
+    partialTrim: "减仓候选",
+    aggressiveTrim: "激进减仓",
+    reEvaluate: "需要复核",
+    hold: "暂不操作",
+    unknown: "等待数据",
+  } as Record<string, string>)[labelKey]
 }
 
-export function recommendationHeadline(code: string | null | undefined) {
+type HeadlineLabels = Record<string, { lead: string; accent: string }>
+
+export function recommendationHeadline(code: string | null | undefined, labels?: HeadlineLabels) {
   const normalized = code?.toLowerCase() ?? ""
-  if (normalized === "strong_buy") return { lead: "可以", accent: "试买" }
-  if (normalized === "accumulate") return { lead: "可以", accent: "加仓" }
-  if (normalized.includes("trim")) return { lead: "考虑", accent: "减仓" }
-  if (normalized === "re_evaluate") return { lead: "需要", accent: "复核" }
-  if (normalized === "no_action") return { lead: "暂不", accent: "动作" }
-  return { lead: "先", accent: "观察" }
+  const labelKey = normalized === "strong_buy" ? "strongBuy" : normalized === "accumulate" ? "accumulate" : normalized.includes("trim") ? "trim" : normalized === "re_evaluate" ? "reEvaluate" : normalized === "no_action" ? "noAction" : "default"
+  return labels?.[labelKey] ?? ({
+    strongBuy: { lead: "可以", accent: "试买" },
+    accumulate: { lead: "可以", accent: "加仓" },
+    trim: { lead: "考虑", accent: "减仓" },
+    reEvaluate: { lead: "需要", accent: "复核" },
+    noAction: { lead: "暂不", accent: "动作" },
+    default: { lead: "先", accent: "观察" },
+  } as HeadlineLabels)[labelKey]
 }
 
-export function recommendationSignalTitle(code: string | null | undefined) {
+export function recommendationSignalTitle(code: string | null | undefined, labels?: Record<string, string>) {
   const normalized = code?.toLowerCase() ?? ""
-  if (normalized === "strong_buy") return "价格进入试探区间"
-  if (normalized === "accumulate") return "收益率回到可接受区间"
-  if (normalized.includes("trim")) return "收益率偏低，先保护仓位"
-  if (normalized === "re_evaluate") return "资料需要重新确认"
-  if (normalized === "no_action") return "当前没有需要执行的动作"
-  return "等待收益率重新抬升"
+  const labelKey = normalized === "strong_buy" ? "strongBuy" : normalized === "accumulate" ? "accumulate" : normalized.includes("trim") ? "trim" : normalized === "re_evaluate" ? "reEvaluate" : normalized === "no_action" ? "noAction" : "default"
+  return labels?.[labelKey] ?? ({
+    strongBuy: "价格进入试探区间",
+    accumulate: "收益率回到可接受区间",
+    trim: "收益率偏低，先保护仓位",
+    reEvaluate: "资料需要重新确认",
+    noAction: "当前没有需要执行的动作",
+    default: "等待收益率重新抬升",
+  } as Record<string, string>)[labelKey]
 }
 
 export function hasAnalysisData(analysis: Pick<StockAnalysisResult, "modelStatusCode" | "closePrice" | "modelDividendPerShare" | "priceZoneConfirmed"> | null | undefined) {

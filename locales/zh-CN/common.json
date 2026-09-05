@@ -1,4 +1,54 @@
 {
+  "ui": {
+    "appName": "股息收割",
+    "brandName": "Dividend Harvest",
+    "pageTitle": "Dividend Harvest · 股息收割",
+    "appEyebrow": "DIVIDEND HARVEST / A-SHARE REFERENCE",
+    "brandCaption": "股息收割 · 长期积累",
+    "backToOverview": "返回今日决策",
+    "mainNavigation": "主导航",
+    "mobileNavigation": "移动端主导航",
+    "nav": {
+      "overview": "今日决策",
+      "stocks": "股票资料",
+      "budget": "资金预算",
+      "portfolio": "交易记录",
+      "settings": "设置"
+    },
+    "data": {
+      "referenceTitle": "每日交易参考",
+      "synced": "资料已更新",
+      "pending": "资料同步中",
+      "unknown": "按交易日更新",
+      "tradingDay": "按交易日整理",
+      "everyTradingDay": "每交易日整理",
+      "updatedAt": "数据更新时间 {updatedAt}"
+    },
+    "theme": {
+      "label": "主题设置",
+      "light": "日间",
+      "dark": "夜间",
+      "system": "系统"
+    },
+    "language": {
+      "label": "语言设置",
+      "select": "选择语言",
+      "zhCN": "中文",
+      "enUS": "EN"
+    },
+    "settings": "打开设置",
+    "scrollToTop": "回到顶部",
+    "states": {
+      "readingData": "正在读取数据…",
+      "connecting": "正在连接本地组合…",
+      "preparingSetup": "正在准备首次设置…",
+      "setupCompleteSync": "组合已建立，股票资料正在后台同步。",
+      "setupCompleteDeferred": "组合已建立；本次后台同步未入队，系统会在下一次手动或交易日同步时重试。"
+    },
+    "disclaimer": "仅供个人研究与模拟记录，不构成投资建议，也不会自动下单。",
+    "researchOnly": "仅供研究",
+    "aShareOnly": "仅 A 股"
+  },
   "application_error_unknown": {
     "status_code": 500,
     "title": "系统暂时无法处理请求",
