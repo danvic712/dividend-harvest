@@ -24,8 +24,8 @@ export function RecommendationDecision({ recommendation, onRecord }: { recommend
 
   return (
     <>
-      <section className="d-hero">
-        <div className="d-story">
+      <section className="d-hero d-ready-hero">
+        <div className="d-story d-ready-story">
           <div className="d-kicker"><span>01</span><span>{decisionCopy.actionKicker}</span><i /></div>
           <div className="d-stock-identity">
             <div className="d-stock-avatar">{securityName.slice(0, 2)}</div>

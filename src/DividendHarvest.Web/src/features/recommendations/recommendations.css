@@ -306,7 +306,7 @@
 }
 
 /* A ready-state summary for people who want the plain-language answer first. */
-.d-guidance { margin-bottom: 4px; padding: 15px 18px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 68%, var(--card)); box-shadow: none; }
+.d-guidance { margin: 18px 0 4px; padding: 15px 18px 14px; border-radius: 10px; background: color-mix(in srgb, var(--accent-soft) 68%, var(--card)); box-shadow: none; }
 .d-guidance-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .d-guidance-heading > span { color: var(--muted-foreground); font-size: 10px; }
 .d-guidance-content { display: grid; grid-template-columns: 34px minmax(230px, 1fr) auto; align-items: center; gap: 13px; margin-top: 12px; }
@@ -444,9 +444,9 @@
 
 /* Layout polish: shared columns, balanced actions, and a compact stock rail. */
 .overview-page {
-  --overview-column-gap: clamp(28px, 4.6vw, 76px);
-  --overview-left-column: minmax(0, 1.08fr);
-  --overview-right-column: minmax(340px, .92fr);
+  --overview-column-gap: clamp(24px, 3vw, 52px);
+  --overview-left-column: minmax(0, 1fr);
+  --overview-right-column: minmax(0, 1fr);
 }
 
 .overview-page .d-watchlist {
@@ -499,6 +499,42 @@
 .overview-page .d-hero {
   padding-top: 24px;
   padding-bottom: 16px;
+}
+
+.overview-page .d-ready-hero {
+  align-items: stretch;
+}
+
+.overview-page .d-ready-story {
+  display: grid;
+  align-content: center;
+  width: 100%;
+  max-width: none;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 28px 24px;
+  border: 2px solid color-mix(in srgb, var(--border) 92%, var(--accent-soft));
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--card) 78%, var(--accent-soft));
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 9%, transparent), 0 14px 30px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.overview-page .d-position-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 8px;
+}
+
+.overview-page .d-position-hero strong,
+.overview-page .d-position-hero span,
+.overview-page .d-position-hero b {
+  white-space: nowrap;
+}
+
+.overview-page .d-position-hero b {
+  margin-left: 0;
+  justify-self: end;
 }
 
 .overview-page .d-pending-grid {
@@ -577,6 +613,7 @@
   .overview-page .d-hero,
   .overview-page .d-pending-grid { grid-template-columns: 1fr; gap: 30px; }
   .overview-page .d-hero { padding: 24px 0 22px; }
+  .overview-page .d-ready-story { min-height: 0; padding: 24px 22px; }
   .overview-page .d-pending-grid { align-items: stretch; }
   .overview-page .d-signal-card { max-width: none; }
 }
@@ -612,6 +649,18 @@
   }
 
   .overview-page .d-action-row { --action-control-height: 56px; }
+
+  .overview-page .d-ready-story { padding: 19px 15px 20px; border-radius: 20px; }
+
+  .overview-page .d-position-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 5px;
+  }
+
+  .overview-page .d-position-hero b {
+    grid-column: 2;
+    justify-self: end;
+  }
 }
 
 /* Overview polish pass: keep the single-stock state compact and the workflow readable. */
