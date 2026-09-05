@@ -1,4 +1,100 @@
 {
+  "ui": {
+    "page": {
+      "eyebrow": "交易记录 / 模拟手帐",
+      "title": "把决定，记成自己的数据。",
+      "description": "记录已经发生的模拟买入或卖出，系统会更新持仓、核心股数、目标股数和成本价。这里只做记录，不会替你下单。"
+    },
+    "actions": {
+      "refresh": "重新读取",
+      "refreshing": "读取中…",
+      "submit": "保存交易记录",
+      "submitting": "保存中…",
+      "goSetup": "去建立组合"
+    },
+    "guide": {
+      "eyebrow": "先看这三步",
+      "title": "先记清楚，再决定下一步。",
+      "description": "把一次买入或卖出写进手帐，新的持仓状态会成为后续建议的基础。",
+      "steps": [
+        { "number": "01", "title": "选一只股票", "description": "可以从你的组合中选择，也可以从股票详情页带入。" },
+        { "number": "02", "title": "写下真实数字", "description": "填写发生日期、股数、成交价和交易费用。" },
+        { "number": "03", "title": "看懂持仓变化", "description": "保存后立刻看到持仓、核心股数和成本价的新状态。" }
+      ]
+    },
+    "form": {
+      "eyebrow": "01 / 记下一笔",
+      "title": "把这次决定留在手帐里",
+      "description": "这里只记录，不会发送到券商。卖出时系统会检查当前持仓是否足够。",
+      "direction": "交易方向",
+      "buy": "模拟买入",
+      "sell": "模拟卖出",
+      "stock": "股票",
+      "stockPlaceholder": "请选择股票",
+      "stockHint": "只显示已经加入个人组合的股票。",
+      "currentStock": "当前正在记录",
+      "position": "现在的持仓",
+      "positionNone": "还没有持仓",
+      "positionHint": "平均成本 {cost} / 股",
+      "positionEmptyHint": "保存后会在这里看到变化。",
+      "date": "交易日期",
+      "quantity": "成交股数",
+      "quantityPlaceholder": "例如 100",
+      "price": "成交价格",
+      "pricePlaceholder": "例如 12.80",
+      "fee": "交易费用",
+      "source": "来源记录标识（可选）",
+      "sourcePlaceholder": "例如券商流水号或个人笔记编号",
+      "sourceHint": "只用于帮助你回看这笔记录，不影响持仓计算。"
+    },
+    "result": {
+      "eyebrow": "02 / 持仓结果",
+      "title": "先看懂现在，再记下一笔",
+      "description": "当前选择：{stock}。这张小结帮助你确认持仓，再决定要不要记录。",
+      "stockFallback": "当前选择的股票",
+      "currentHolding": "当前持仓",
+      "currentHoldingHint": "当前平均成本 {cost} / 股",
+      "noHolding": "暂时没有持仓",
+      "placeholderTitle": "保存一笔后，这里会出现新的持仓快照。",
+      "placeholderDescription": "填写左侧表单并保存，系统会返回最新的持仓状态。",
+      "placeholderValue": "—",
+      "principal": "成交本金，不含交易费用",
+      "buyResult": "本次模拟买入",
+      "sellResult": "本次模拟卖出",
+      "heldShares": "持仓股数",
+      "coreShares": "核心股数",
+      "targetShares": "目标股数",
+      "targetGap": "距离目标",
+      "targetReached": "已经达到",
+      "targetGapRemaining": "还差 {shares} 股",
+      "targetGapExceeded": "超过 {shares} 股",
+      "averageCost": "当前成本价",
+      "averageCostHint": "按已记录的持仓计算",
+      "shareUnit": "股",
+      "note": "这组数据会被今日决策页用来计算更贴近你的参考。",
+      "emptyInputTitle": "填写股数和价格，就能看到变化",
+      "emptyInputDescription": "保存前先确认金额和持仓变化，心里更有数。",
+      "previewTradeAmount": "这次计入金额",
+      "previewHeldShares": "保存后预估持仓",
+      "previewHint": "这里只是预览；卖出时系统仍会检查当前持仓是否足够。",
+      "savedTitle": "交易记录已保存",
+      "savedDescription": "这笔记录已写入本地数据库，之后的组合建议会读取新的持仓状态。"
+    },
+    "states": {
+      "loading": "正在整理交易手帐…",
+      "readError": "持仓股票暂时无法读取。",
+      "recordError": "交易记录失败，请检查填写内容。",
+      "noticeTitle": "记录提醒",
+      "emptyTitle": "还没有可记录的股票",
+      "emptyDescription": "完成首次设置后，才能为股票记录买入和卖出。"
+    },
+    "validation": {
+      "stock": "请选择要记录的股票。",
+      "quantity": "请填写大于零的成交股数。",
+      "price": "请填写大于零的成交价格。",
+      "fee": "交易费用不能小于零。"
+    }
+  },
   "budget_validation_failed": {
     "status_code": 400,
     "title": "预算流水请求无效",

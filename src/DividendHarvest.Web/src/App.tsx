@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { ErrorState, LoadingState } from "@/components/async-state"
 import { ScrollToTop } from "@/components/scroll-to-top"
@@ -24,7 +24,13 @@ export default function App() {
 
 function AppContent() {
   const { locale, messages } = useLocale()
+  const setupErrorRef = useRef(messages.common.application_error_unknown.detail)
   const [path, setPath] = useState(currentPath)
+  const [portfolioStockKey, setPortfolioStockKey] = useState(() => {
+    const query = new URLSearchParams(window.location.search)
+    const queryStockKey = query.get("stock") ?? (query.get("code") && query.get("exchange") ? `${query.get("code")}:${query.get("exchange")}` : null)
+    return queryStockKey ?? window.sessionStorage.getItem("dividend-harvest-portfolio-stock") ?? ""
+  })
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
   const [setupNotice, setSetupNotice] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,6 +47,10 @@ function AppContent() {
     document.documentElement.lang = locale
   }, [locale, messages.common.ui.pageTitle])
 
+  useEffect(() => {
+    setupErrorRef.current = messages.common.application_error_unknown.detail
+  }, [messages.common.application_error_unknown.detail])
+
   const checkSetup = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -54,11 +64,11 @@ function AppContent() {
         navigate("/overview")
       }
     } catch (statusError) {
-      setError(getApiErrorMessage(statusError, messages.common.application_error_unknown.detail))
+      setError(getApiErrorMessage(statusError, setupErrorRef.current))
     } finally {
       setLoading(false)
     }
-  }, [messages.common.application_error_unknown.detail, navigate])
+  }, [navigate])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => { void checkSetup() }, 0)
@@ -74,7 +84,7 @@ function AppContent() {
     if (path === "/setup") return <SetupPage onComplete={(result: SetupResult) => { setSetupStatus({ isComplete: true, missingRequirements: [] }); setSetupNotice(result.stockDataSyncScheduled ? messages.common.ui.states.setupCompleteSync : messages.common.ui.states.setupCompleteDeferred); navigate("/overview") }} />
     if (path === "/stocks") return <StocksPage onNavigate={navigate} />
     if (path === "/budget") return <BudgetPage onNavigate={navigate} />
-    if (path === "/portfolio") return <PortfolioPage onNavigate={navigate} />
+    if (path === "/portfolio") return <PortfolioPage onNavigate={navigate} selectedStockKey={portfolioStockKey} onSelectedStockKeyChange={setPortfolioStockKey} />
     if (path === "/settings") return <SettingsPage onNavigate={navigate} />
     return <RecommendationsPage onNavigate={navigate} notice={setupNotice} />
   }

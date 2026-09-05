@@ -1,4 +1,100 @@
 {
+  "ui": {
+    "page": {
+      "eyebrow": "TRADE LOG / SIMULATION NOTEBOOK",
+      "title": "Turn each decision into your own data.",
+      "description": "Record simulated buys and sells, then see the updated holding, core shares, target shares, and cost basis. This page records decisions; it never places orders."
+    },
+    "actions": {
+      "refresh": "Reload positions",
+      "refreshing": "Reading…",
+      "submit": "Save trade record",
+      "submitting": "Saving…",
+      "goSetup": "Build my portfolio"
+    },
+    "guide": {
+      "eyebrow": "START HERE",
+      "title": "Write it down before you decide again.",
+      "description": "Record one buy or sell so the new holding state can support the next reference.",
+      "steps": [
+        { "number": "01", "title": "Choose a stock", "description": "Pick one from your portfolio, or open this page from a stock detail view." },
+        { "number": "02", "title": "Use the real numbers", "description": "Enter the date, shares, execution price, and trading fee." },
+        { "number": "03", "title": "Read the change", "description": "Save and see the new holding, core shares, and cost basis right away." }
+      ]
+    },
+    "form": {
+      "eyebrow": "01 / WRITE IT DOWN",
+      "title": "Keep this decision in your notebook",
+      "description": "This only records the event; it never sends an order. Sells are checked against your current holding.",
+      "direction": "Trade direction",
+      "buy": "Simulated buy",
+      "sell": "Simulated sell",
+      "stock": "Stock",
+      "stockPlaceholder": "Choose a stock",
+      "stockHint": "Only stocks already in your personal portfolio are shown.",
+      "currentStock": "Recording now",
+      "position": "Current holding",
+      "positionNone": "No holding yet",
+      "positionHint": "Average cost {cost} / share",
+      "positionEmptyHint": "The change will appear here after saving.",
+      "date": "Trade date",
+      "quantity": "Shares traded",
+      "quantityPlaceholder": "For example 100",
+      "price": "Execution price",
+      "pricePlaceholder": "For example 12.80",
+      "fee": "Trading fee",
+      "source": "Source record (optional)",
+      "sourcePlaceholder": "For example a broker reference",
+      "sourceHint": "Only helps you find the record later; it does not change the position calculation."
+    },
+    "result": {
+      "eyebrow": "02 / POSITION RESULT",
+      "title": "Understand today before recording again",
+      "description": "Selected: {stock}. Use this small summary to check your position before saving.",
+      "stockFallback": "Selected stock",
+      "currentHolding": "Current holding",
+      "currentHoldingHint": "Current average cost {cost} / share",
+      "noHolding": "No holding yet",
+      "placeholderTitle": "A new position snapshot will appear after you save a record.",
+      "placeholderDescription": "Complete the form and save it to receive the latest position state.",
+      "placeholderValue": "—",
+      "principal": "Trade principal, excluding fees",
+      "buyResult": "Simulated buy",
+      "sellResult": "Simulated sell",
+      "heldShares": "Held shares",
+      "coreShares": "Core shares",
+      "targetShares": "Target shares",
+      "targetGap": "Distance to target",
+      "targetReached": "Target reached",
+      "targetGapRemaining": "{shares} shares left",
+      "targetGapExceeded": "{shares} shares over",
+      "averageCost": "Average cost",
+      "averageCostHint": "Based on recorded positions",
+      "shareUnit": "shares",
+      "note": "Today’s decision page will use this position to make the reference more personal.",
+      "emptyInputTitle": "Enter shares and price to preview the change",
+      "emptyInputDescription": "Check the amount and position change before saving, so the decision feels clear.",
+      "previewTradeAmount": "Amount recorded",
+      "previewHeldShares": "Estimated holding after save",
+      "previewHint": "This is only a preview; sells are still checked against your current holding.",
+      "savedTitle": "Trade record saved",
+      "savedDescription": "The record is saved locally. Future portfolio references will use the updated position."
+    },
+    "states": {
+      "loading": "Organizing your trade notebook…",
+      "readError": "Your portfolio stocks are temporarily unavailable.",
+      "recordError": "The trade record could not be saved. Check the fields and try again.",
+      "noticeTitle": "Record notice",
+      "emptyTitle": "There are no stocks to record yet",
+      "emptyDescription": "Complete the first setup before recording buys and sells."
+    },
+    "validation": {
+      "stock": "Choose the stock you want to record.",
+      "quantity": "Enter a share quantity greater than zero.",
+      "price": "Enter an execution price greater than zero.",
+      "fee": "The trading fee cannot be negative."
+    }
+  },
   "budget_validation_failed": {
     "status_code": 400,
     "title": "The budget ledger request is invalid",
