@@ -1,0 +1,77 @@
+{
+  "ui": {
+    "page": {
+      "eyebrow": "现金手帐 / 预算",
+      "title": "先把现金记清楚，再决定怎么用。",
+      "description": "记录实际入金、股息和交易现金流。系统会用同一份现金口径，帮助你看懂预算还剩多少。"
+    },
+    "actions": {
+      "refresh": "刷新余额",
+      "refreshing": "刷新中…",
+      "submit": "保存现金流水",
+      "submitting": "记录中…",
+      "openPortfolio": "打开交易记录"
+    },
+    "form": {
+      "eyebrow": "01 / 记下一笔",
+      "title": "把发生过的现金留在手帐里",
+      "description": "只记录已经发生的金额，不需要预测；买入、卖出和实际股息需要关联对应股票。",
+      "date": "发生日期",
+      "type": "流水类型",
+      "amount": "金额",
+      "amountPlaceholder": "例如 10000",
+      "direction": "现金方向",
+      "stock": "关联股票",
+      "stockPlaceholder": "请选择股票",
+      "noStock": "这笔流水不关联股票",
+      "source": "来源记录标识（可选）",
+      "sourcePlaceholder": "例如券商流水号或个人笔记编号",
+      "sourceHint": "只用于帮助你回看这笔记录，不影响现金计算。",
+      "stockHint": "买入、卖出和实际收到股息需要关联股票。",
+      "inflow": "流入",
+      "outflow": "流出"
+    },
+    "entryTypes": {
+      "budget_deposit": "预算入金",
+      "dividend_received": "实际收到股息",
+      "buy": "买入支出",
+      "sell": "卖出回款",
+      "fee": "交易费用",
+      "cash_adjustment": "现金调整"
+    },
+    "summary": {
+      "eyebrow": "02 / 现金状态",
+      "title": "现在手上有多少现金？",
+      "description": "目前已经记录 {count} 笔现金流水。",
+      "balance": "可用现金余额",
+      "inflow": "累计流入",
+      "outflow": "累计流出",
+      "note": "现金余额只代表已经记录的流水；建议金额还会受到单股预算和现金保留比例限制。",
+      "portfolioHint": "想记录实际买入或卖出？"
+    },
+    "guide": {
+      "eyebrow": "先看这三步",
+      "title": "记一次，三个地方都会更清楚。",
+      "description": "先记录已经发生的现金，再回到其他页面查看新的参考。",
+      "steps": [
+        { "number": "01", "title": "记录真实流水", "description": "入金、股息、买入和卖出都按发生日期记录。" },
+        { "number": "02", "title": "余额自动更新", "description": "保存后重新读取，现金余额会跟着变化。" },
+        { "number": "03", "title": "回到今日决策", "description": "预算会参与每只股票的建议金额计算。" }
+      ]
+    },
+    "states": {
+      "loading": "正在整理现金手帐…",
+      "readError": "预算资料暂时无法读取。",
+      "recordError": "现金流水记录失败，请检查填写内容。",
+      "noticeTitle": "记录提醒",
+      "successTitle": "已记下",
+      "successMessage": "现金流水已记录，余额正在重新读取。",
+      "emptyStock": "还没有可关联的股票",
+      "noSummary": "暂时没有可展示的现金状态。"
+    },
+    "validation": {
+      "amount": "请填写大于零的金额。",
+      "stock": "这类流水需要选择关联股票。"
+    }
+  }
+}

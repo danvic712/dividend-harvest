@@ -1,0 +1,77 @@
+{
+  "ui": {
+    "page": {
+      "eyebrow": "CASH NOTEBOOK / BUDGET",
+      "title": "Know your cash before you decide how to use it.",
+      "description": "Record real deposits, dividends, and trade cash flows. The same cash balance then guides your portfolio references."
+    },
+    "actions": {
+      "refresh": "Refresh balance",
+      "refreshing": "Refreshing…",
+      "submit": "Save cash entry",
+      "submitting": "Saving…",
+      "openPortfolio": "Open trade records"
+    },
+    "form": {
+      "eyebrow": "01 / WRITE IT DOWN",
+      "title": "Keep real cash movements in the notebook",
+      "description": "Record what already happened, not a forecast. Buys, sells, and received dividends need a stock attached.",
+      "date": "Entry date",
+      "type": "Entry type",
+      "amount": "Amount",
+      "amountPlaceholder": "For example 10000",
+      "direction": "Cash direction",
+      "stock": "Related stock",
+      "stockPlaceholder": "Choose a stock",
+      "noStock": "This entry has no stock",
+      "source": "Source record (optional)",
+      "sourcePlaceholder": "For example a broker reference",
+      "sourceHint": "Only helps you find the entry later; it does not change the calculation.",
+      "stockHint": "Buys, sells, and received dividends need a related stock.",
+      "inflow": "Inflow",
+      "outflow": "Outflow"
+    },
+    "entryTypes": {
+      "budget_deposit": "Budget deposit",
+      "dividend_received": "Dividend received",
+      "buy": "Buy payment",
+      "sell": "Sell proceeds",
+      "fee": "Trading fee",
+      "cash_adjustment": "Cash adjustment"
+    },
+    "summary": {
+      "eyebrow": "02 / CASH POSITION",
+      "title": "How much cash is available now?",
+      "description": "You have recorded {count} cash entries so far.",
+      "balance": "Available cash",
+      "inflow": "Total inflow",
+      "outflow": "Total outflow",
+      "note": "Cash only reflects recorded entries. Suggested amounts also respect per-stock limits and the cash reserve ratio.",
+      "portfolioHint": "Need to record an actual buy or sell?"
+    },
+    "guide": {
+      "eyebrow": "START HERE",
+      "title": "One entry makes three places clearer.",
+      "description": "Record what happened, then return to the other pages for an updated reference.",
+      "steps": [
+        { "number": "01", "title": "Record the real movement", "description": "Use the date it happened for deposits, dividends, buys, and sells." },
+        { "number": "02", "title": "The balance updates", "description": "Save the entry and reload to see the new cash position." },
+        { "number": "03", "title": "Return to Today’s decision", "description": "The budget helps calculate each stock’s suggested amount." }
+      ]
+    },
+    "states": {
+      "loading": "Organizing your cash notebook…",
+      "readError": "The budget is temporarily unavailable.",
+      "recordError": "The cash entry could not be saved. Check the fields and try again.",
+      "noticeTitle": "Entry notice",
+      "successTitle": "Saved",
+      "successMessage": "The cash entry was saved. The balance is being refreshed.",
+      "emptyStock": "No stock is available to attach",
+      "noSummary": "There is no cash position to show yet."
+    },
+    "validation": {
+      "amount": "Enter an amount greater than zero.",
+      "stock": "This entry type needs a related stock."
+    }
+  }
+}

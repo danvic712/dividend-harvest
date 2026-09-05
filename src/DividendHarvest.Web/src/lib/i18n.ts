@@ -1,10 +1,12 @@
 import { createContext, createElement, useContext, useMemo, useState, type ReactNode } from "react"
 
 import enCommon from "../../../../locales/en-US/common.json"
+import enBudget from "../../../../locales/en-US/budget.json"
 import enDividendStrategy from "../../../../locales/en-US/dividend-strategy.json"
 import enSetup from "../../../../locales/en-US/setup.json"
 import enStocks from "../../../../locales/en-US/stocks.json"
 import zhCommon from "../../../../locales/zh-CN/common.json"
+import zhBudget from "../../../../locales/zh-CN/budget.json"
 import zhDividendStrategy from "../../../../locales/zh-CN/dividend-strategy.json"
 import zhSetup from "../../../../locales/zh-CN/setup.json"
 import zhStocks from "../../../../locales/zh-CN/stocks.json"
@@ -13,6 +15,9 @@ export type Locale = "zh-CN" | "en-US"
 
 type LocaleMessages = {
   common: typeof zhCommon
+  budget: {
+    ui: typeof zhBudget.ui
+  }
   dividendStrategy: {
     ui: typeof zhDividendStrategy.ui
   }
@@ -27,12 +32,14 @@ type LocaleMessages = {
 const catalogs: Record<Locale, LocaleMessages> = {
   "zh-CN": {
     common: zhCommon,
+    budget: { ui: zhBudget.ui },
     dividendStrategy: { ui: zhDividendStrategy.ui },
     setup: { ui: zhSetup.ui },
     stocks: { ui: zhStocks.ui },
   },
   "en-US": {
     common: enCommon,
+    budget: { ui: enBudget.ui },
     dividendStrategy: { ui: enDividendStrategy.ui },
     setup: { ui: enSetup.ui },
     stocks: { ui: enStocks.ui },
