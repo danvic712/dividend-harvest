@@ -28,12 +28,14 @@ export function LoadingState({ label }: { label?: string }) {
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { messages } = useLocale()
+
   return (
     <Alert variant="destructive">
       <AlertCircle size={18} />
-      <AlertTitle>数据读取失败</AlertTitle>
+      <AlertTitle>{messages.common.ui.states.errorTitle}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
-      {onRetry && <Button className="alert-retry" size="sm" variant="outline" onClick={onRetry}>重新读取</Button>}
+      {onRetry && <Button className="alert-retry" size="sm" variant="outline" onClick={onRetry}>{messages.common.ui.actions.retry}</Button>}
     </Alert>
   )
 }

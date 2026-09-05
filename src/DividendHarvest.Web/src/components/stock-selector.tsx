@@ -43,7 +43,7 @@ export function StockSelector({ stocks, selectedKey, onSelect, recommendations =
             <span className={cn("d-tile-avatar", `d-tile-${statusTone}`)}>{initials}</span>
             <span className="d-tile-name"><strong>{stockName}</strong><span>{stock.securityCode}.{stock.exchangeCode}</span></span>
             <span className="d-tile-quote"><strong>{recommendation?.analysis.closePrice === null || recommendation?.analysis.closePrice === undefined ? "—" : `¥${recommendation.analysis.closePrice.toFixed(2)}`}</strong><span>{stock.sectorCode ?? labels?.sectorUnset ?? "行业未设置"}</span></span>
-            <span className={cn("signal-badge", `signal-${statusTone}`, isReady ? "signal-ready" : "signal-pending")}>{statusLabel}</span>
+            <span key={`${stockKey(stock)}-${statusLabel}`} className={cn("signal-badge", `signal-${statusTone}`, isReady ? "signal-ready" : "signal-pending")}>{statusLabel}</span>
             {selected ? <Check className="d-tile-arrow" size={15} /> : <ChevronRight className="d-tile-arrow" size={15} />}
           </Button>
         )

@@ -34,5 +34,97 @@
     "status_code": 404,
     "title": "股票尚未配置",
     "detail": "股票 {securityCode}（{exchangeCode}）尚未配置到关注列表。"
+  },
+  "ui": {
+    "page": {
+      "eyebrow": "STOCK LIBRARY / SOURCE DATA",
+      "title": "股票资料，保持可追溯。",
+      "description": "每个价格、股息和财务快照都来自后端同步结果。缺失资料会明确显示，不会用前端默认值掩盖。",
+      "watchlistLabel": "WATCHLIST",
+      "watchlistTitle": "{count} 只 A 股",
+      "watchlistDescription": "按股票单独查看模型输入和结果。"
+    },
+    "actions": {
+      "syncAll": "同步全部资料",
+      "syncing": "同步中…",
+      "resync": "重新同步",
+      "configure": "去配置参数",
+      "goSetup": "去建立组合"
+    },
+    "states": {
+      "loadingList": "正在读取股票资料…",
+      "loadingAnalysis": "正在读取这只股票的分析…",
+      "readError": "股票资料暂时无法读取。",
+      "analysisError": "这只股票的分析资料暂时无法读取。",
+      "syncError": "资料同步失败，请稍后重试。",
+      "emptyTitle": "还没有股票资料",
+      "emptyDescription": "完成首次设置后，这里会展示每只股票的资料、持仓和模型参数。",
+      "dataWarningTitle": "读取提醒",
+      "syncComplete": "资料同步完成",
+      "pendingTitle": "资料还在路上。",
+      "pendingDescription": "这只股票已经保存到你的组合。基础资料、行情、股息和财务快照完成同步后，这里会自动出现价格阶梯。",
+      "pendingMessage": "资料仍在后台同步，完整分析暂未生成。",
+      "explanationFallback": "当前没有可展示的模型解释。"
+    },
+    "selector": {
+      "kicker": "我的股票",
+      "title": "今天先看哪一只？",
+      "description": "{count} 只关注标的 · 每只单独配置",
+      "selectionHint": "选中后查看详细资料",
+      "listLabel": "股票列表",
+      "pending": "等待数据",
+      "sectorUnset": "行业未设置",
+      "signals": {
+        "strongBuy": "可以试买",
+        "accumulate": "分批加仓",
+        "partialTrim": "减仓候选",
+        "aggressiveTrim": "考虑减仓",
+        "reEvaluate": "需要复核",
+        "hold": "暂不操作",
+        "unknown": "等待数据"
+      }
+    },
+    "detail": {
+      "readingLabel": "资料读数",
+      "dataIdentity": "{code}.{exchange} · {exchangeLabel} A 股 · 数据日 {date}",
+      "pendingIdentity": "{code}.{exchange} · 等待资料同步",
+      "confirmed": "价格区间已确认",
+      "unconfirmed": "价格区间待确认",
+      "metrics": {
+        "closePrice": "最新收盘",
+        "dividendYield": "TTM 股息率",
+        "modelDividend": "模型股息 / 股",
+        "heldShares": "持仓股数",
+        "coreShares": "核心股数",
+        "satelliteShares": "卫星股数"
+      },
+      "priceSectionLabel": "价格阶梯",
+      "priceSectionTitle": "把价格翻译成分量。",
+      "priceSectionDescription": "和总览使用同一套后端模型参数。",
+      "currentPrice": "当前价格",
+      "parametersLabel": "MODEL PARAMETERS",
+      "parametersTitle": "这只股票的参数",
+      "parametersDescription": "模型参数按股票独立保存，修改后由下一次分析读取。",
+      "missingParametersTitle": "还没有模型参数",
+      "missingParametersDescription": "请先为这只股票建立参数，后端才会生成完整价格阶梯。",
+      "parameterNames": {
+        "modelVersion": "模型版本",
+        "strongBuyYield": "强买入收益率",
+        "accumulationYield": "加仓收益率",
+        "partialTrimYield": "减仓候选收益率",
+        "aggressiveTrimYield": "激进减仓收益率",
+        "maxSecurityWeight": "单股最大权重",
+        "maxSectorWeight": "行业最大权重",
+        "cashReserveRatio": "现金保留比例",
+        "maxSingleTradeAmount": "单次交易上限",
+        "tradingLotSize": "交易单位",
+        "tradingLotSuffix": "股",
+        "effectiveFromDate": "生效日期"
+      }
+    },
+    "sync": {
+      "attempted": "尝试 {count} 只，完整完成 {complete} 只，部分失败 {failed} 只。",
+      "failures": "失败项 {items}。"
+    }
   }
 }

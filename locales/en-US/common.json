@@ -40,10 +40,14 @@
       "zhCN": "中文",
       "enUS": "EN"
     },
+    "actions": {
+      "retry": "Retry"
+    },
     "settings": "Open settings",
     "scrollToTop": "Back to top",
     "states": {
       "readingData": "Reading data…",
+      "errorTitle": "Could not read the data",
       "connecting": "Connecting to your local portfolio…",
       "preparingSetup": "Preparing first-time setup…",
       "setupCompleteSync": "Portfolio created. Stock data is syncing in the background.",

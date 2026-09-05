@@ -289,7 +289,7 @@ button { cursor: pointer; }
   .decision-layout, .stock-detail-grid { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .topbar { display: flex; justify-content: space-between; min-height: 64px; padding: 12px 18px; }
   .main-nav { display: none; }
   .topbar-actions .status-chip, .topbar-actions .locale-control { display: none; }
@@ -325,7 +325,7 @@ button { cursor: pointer; }
 }
 
 /* Production dashboard follows the approved Variant D editorial layout. */
-.app-frame { position: relative; overflow: hidden; }
+.app-frame { position: relative; overflow: clip; }
 .app-frame::before { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(color-mix(in srgb, var(--foreground) 3%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 3%, transparent) 1px, transparent 1px); background-size: 56px 56px; mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.42), transparent 58%); content: ""; }
 .topbar, .page-wrap, .app-footer { position: relative; z-index: 1; }
 .d-watchlist { margin-top: 12px; }
@@ -469,7 +469,7 @@ button { cursor: pointer; }
   .locale-control { padding-inline: 6px; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .d-header { display: flex; min-height: 64px; padding-inline: 18px; }
   .d-header .main-nav { display: none; }
   .d-header .topbar-actions { display: flex; gap: 6px; margin-left: auto; }

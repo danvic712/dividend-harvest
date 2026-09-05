@@ -1,22 +1,29 @@
 import { Database, RefreshCw } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/async-state"
 import { PageFrame } from "@/components/page-frame"
 import { PageTitle, SectionHeading } from "@/components/page-heading"
-import { EmptyState, ErrorState, LoadingState } from "@/components/async-state"
 import { PriceLadder, PriceZoneBoard } from "@/components/price-ladder"
 import { StockSelector } from "@/components/stock-selector"
+import { StockActionSummary } from "@/features/stocks/StockActionSummary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import { getApiErrorMessage } from "@/lib/api-errors"
+import { interpolate, useLocale } from "@/lib/i18n"
 import { displayStockName, exchangeLabel, hasAnalysisData } from "@/lib/stock-display"
 import { formatDate, formatDateTime, formatMoney, formatPercent, stockKey } from "@/lib/utils"
 import type { StockAnalysisResult, StockDataSyncRunResult, StockModelParameterSet, StockWatchlistItem } from "@/lib/api-types"
 import { getModelParameters, getStockAnalysis, getStocks, syncStocks } from "@/features/stocks/stocks.api"
+import { StockDetailSkeleton } from "@/features/stocks/StockDetailSkeleton"
 import "./stocks.css"
 
 export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const { messages } = useLocale()
+  const copy = messages.stocks.ui
   const [stocks, setStocks] = useState<StockWatchlistItem[]>([])
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<StockAnalysisResult | null>(null)
@@ -27,20 +34,28 @@ export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void 
   const [detailError, setDetailError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<StockDataSyncRunResult | null>(null)
+  const stocksRef = useRef<StockWatchlistItem[]>([])
+  const detailStageRef = useRef<HTMLDivElement>(null)
+  const [detailMinHeight, setDetailMinHeight] = useState<number | null>(null)
 
-  const loadStocks = useCallback(async () => {
-    setLoading(true)
+  const applyStocks = useCallback((list: StockWatchlistItem[]) => {
+    stocksRef.current = list
+    setStocks(list)
+    setSelectedKey((current) => current && list.some((stock) => stockKey(stock) === current) ? current : list[0] ? stockKey(list[0]) : null)
+  }, [])
+
+  const loadStocks = useCallback(async ({ preserveView = false }: { preserveView?: boolean } = {}) => {
+    if (!preserveView) setLoading(true)
     setError(null)
     try {
       const list = await getStocks()
-      setStocks(list)
-      setSelectedKey((current) => current && list.some((stock) => stockKey(stock) === current) ? current : list[0] ? stockKey(list[0]) : null)
+      applyStocks(list)
     } catch (loadError) {
-      setError(getApiErrorMessage(loadError, "股票资料暂时无法读取。"))
+      setError(getApiErrorMessage(loadError, copy.states.readError))
     } finally {
-      setLoading(false)
+      if (!preserveView) setLoading(false)
     }
-  }, [])
+  }, [applyStocks, copy.states.readError])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => { void loadStocks() }, 0)
@@ -48,16 +63,21 @@ export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void 
   }, [loadStocks])
 
   const loadDetail = useCallback(async (signal?: AbortSignal) => {
-    const stock = stocks.find((item) => stockKey(item) === selectedKey)
+    const stock = stocksRef.current.find((item) => stockKey(item) === selectedKey)
     if (!stock) {
       setAnalysis(null)
       setParameters(null)
       return
     }
+
     setDetailLoading(true)
+    setDetailMinHeight((current) => current ?? detailStageRef.current?.getBoundingClientRect().height ?? null)
     setDetailError(null)
     try {
-      const [analysisResult, parameterResult] = await Promise.all([getStockAnalysis(stock.securityCode, stock.exchangeCode, signal), getModelParameters(stock.securityCode, stock.exchangeCode, signal)])
+      const [analysisResult, parameterResult] = await Promise.all([
+        getStockAnalysis(stock.securityCode, stock.exchangeCode, signal),
+        getModelParameters(stock.securityCode, stock.exchangeCode, signal),
+      ])
       if (!signal?.aborted) {
         setAnalysis(analysisResult.analysis)
         setParameters(parameterResult)
@@ -66,12 +86,19 @@ export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void 
       if (!signal?.aborted) {
         setAnalysis(null)
         setParameters(null)
-        setDetailError(getApiErrorMessage(detailLoadError, "这只股票的分析资料暂时无法读取。"))
+        setDetailError(getApiErrorMessage(detailLoadError, copy.states.analysisError))
       }
     } finally {
       if (!signal?.aborted) setDetailLoading(false)
     }
-  }, [selectedKey, stocks])
+  }, [copy.states.analysisError, selectedKey])
+
+  useEffect(() => {
+    if (detailLoading || detailMinHeight === null) return
+
+    const timeoutId = window.setTimeout(() => setDetailMinHeight(null), 420)
+    return () => window.clearTimeout(timeoutId)
+  }, [detailLoading, detailMinHeight])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -88,51 +115,178 @@ export function StocksPage({ onNavigate }: { onNavigate: (path: string) => void 
     setError(null)
     try {
       setSyncResult(await syncStocks())
-      await loadStocks()
+      await loadStocks({ preserveView: true })
     } catch (syncError) {
-      setError(getApiErrorMessage(syncError, "资料同步失败，请稍后重试。"))
+      setError(getApiErrorMessage(syncError, copy.states.syncError))
     } finally {
       setSyncing(false)
     }
   }
 
-  if (loading) return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="pending"><LoadingState label="正在读取股票资料…" /></PageFrame>
-  if (error && !stocks.length) return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="unknown"><ErrorState message={error} onRetry={() => void loadStocks()} /></PageFrame>
-  if (!stocks.length) return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="unknown"><EmptyState title="还没有股票资料" description="完成首次设置后，这里会展示每只股票的资料、持仓和模型参数。" action={<Button onClick={() => onNavigate("/setup")}>去建立组合</Button>} /></PageFrame>
+  function selectStock(stock: StockWatchlistItem) {
+    const nextKey = stockKey(stock)
+    if (nextKey === selectedKey) return
+
+    setDetailMinHeight((current) => current ?? detailStageRef.current?.getBoundingClientRect().height ?? null)
+    setSelectedKey(nextKey)
+    setAnalysis(null)
+    setParameters(null)
+    setDetailError(null)
+    setDetailLoading(true)
+  }
+
+  if (loading) {
+    return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="pending" contentClassName="stocks-page-wrap"><LoadingState label={copy.states.loadingList} /></PageFrame>
+  }
+
+  if (error && !stocks.length) {
+    return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="unknown" contentClassName="stocks-page-wrap"><ErrorState message={error} onRetry={() => void loadStocks()} /></PageFrame>
+  }
+
+  if (!stocks.length) {
+    return <PageFrame currentPath="/stocks" onNavigate={onNavigate} dataState="unknown" contentClassName="stocks-page-wrap"><EmptyState title={copy.states.emptyTitle} description={copy.states.emptyDescription} action={<Button onClick={() => onNavigate("/setup")}>{copy.actions.goSetup}</Button>} /></PageFrame>
+  }
 
   const selectedStock = stocks.find((stock) => stockKey(stock) === selectedKey) ?? stocks[0]
   const analysisReady = hasAnalysisData(analysis)
   const lastUpdated = analysis?.computedAt ? formatDateTime(analysis.computedAt) : null
+  const selectedRecommendation = analysis
+    ? [{ analysis, suggestedBuyShares: 0, suggestedSellShares: 0, suggestedTradeAmount: 0, estimatedTransactionFeeAmount: 0 }]
+    : []
+
   return (
-    <PageFrame currentPath="/stocks" onNavigate={onNavigate} lastUpdated={lastUpdated} dataState={analysisReady ? "synced" : "pending"}>
-      <PageTitle eyebrow="STOCK LIBRARY / SOURCE DATA" title="股票资料，保持可追溯。" description="每个价格、股息和财务快照都来自后端同步结果。缺失资料会明确显示，不会用前端默认值掩盖。" actions={<Button onClick={() => void syncAll()} disabled={syncing}><RefreshCw data-icon="inline-start" />{syncing ? "同步中…" : "同步全部资料"}</Button>} />
-      {error && <Alert variant="destructive" className="d-inline-alert"><AlertTitle>读取提醒</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+    <PageFrame currentPath="/stocks" onNavigate={onNavigate} lastUpdated={lastUpdated} dataState={analysisReady ? "synced" : "pending"} contentClassName="stocks-page-wrap">
+      <PageTitle
+        eyebrow={copy.page.eyebrow}
+        title={copy.page.title}
+        description={copy.page.description}
+        actions={<Button onClick={() => void syncAll()} disabled={syncing}>{syncing ? <><RefreshCw className="spin" data-icon="inline-start" />{copy.actions.syncing}</> : <><RefreshCw data-icon="inline-start" />{copy.actions.syncAll}</>}</Button>}
+      />
+
+      {error && <Alert variant="destructive" className="d-inline-alert"><AlertTitle>{copy.states.dataWarningTitle}</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+
       <div className="stocks-layout">
-        <section className="surface stock-directory"><SectionHeading label="WATCHLIST" title={`${stocks.length} 只 A 股`} description="按股票单独查看模型输入和结果。" /><StockSelector stocks={stocks} selectedKey={selectedKey} onSelect={(stock) => setSelectedKey(stockKey(stock))} /></section>
-        <section className="surface stock-detail">
-          {detailLoading ? <LoadingState label="正在读取这只股票的分析…" /> : analysisReady && analysis ? <StockDetail analysis={analysis} parameters={parameters} onNavigate={onNavigate} /> : <StockDetailPending stock={selectedStock} message={detailError ?? (analysis ? "资料仍在后台同步，完整分析暂未生成。" : null)} onSync={() => void syncAll()} />}
-        </section>
+        <Card className="stock-directory">
+          <CardHeader className="stock-directory-header">
+            <SectionHeading label={copy.page.watchlistLabel} title={interpolate(copy.page.watchlistTitle, { count: stocks.length })} description={copy.page.watchlistDescription} />
+          </CardHeader>
+          <CardContent>
+            <StockSelector
+              stocks={stocks}
+              recommendations={selectedRecommendation}
+              selectedKey={selectedKey}
+              onSelect={selectStock}
+              labels={{
+                kicker: copy.selector.kicker,
+                title: copy.selector.title,
+                description: interpolate(copy.selector.description, { count: stocks.length }),
+                selectionHint: copy.selector.selectionHint,
+                listLabel: copy.selector.listLabel,
+                pending: copy.selector.pending,
+                sectorUnset: copy.selector.sectorUnset,
+                signals: copy.selector.signals,
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="stock-detail">
+          <CardContent className="stock-detail-content">
+            <div ref={detailStageRef} className="stock-detail-stage" style={detailMinHeight ? { minHeight: detailMinHeight } : undefined}>
+              <div className={`stock-detail-scene ${detailLoading ? "stock-detail-scene-loading" : "stock-detail-scene-ready"}`} key={`${selectedKey ?? "empty"}-${detailLoading ? "loading" : analysis?.computedAt ?? "pending"}`}>
+                {detailLoading ? <StockDetailSkeleton label={copy.states.loadingAnalysis} /> : analysisReady && analysis ? <StockDetail analysis={analysis} parameters={parameters} onNavigate={onNavigate} /> : <StockDetailPending stock={selectedStock} message={detailError ?? (analysis ? copy.states.pendingMessage : null)} onSync={() => void syncAll()} />}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-      {syncResult && <section className="sync-results"><Alert variant={syncResult.partiallyFailedStockCount ? "attention" : "default"}><AlertTitle><Database size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />资料同步完成</AlertTitle><AlertDescription>尝试 {syncResult.attemptedStockCount} 只，完整完成 {syncResult.fullyCompletedStockCount} 只，部分失败 {syncResult.partiallyFailedStockCount} 只。{syncResult.failures.length ? `失败项 ${syncResult.failures.map((failure) => `${failure.securityCode} ${failure.dataKind}`).join("、")}。` : ""}</AlertDescription></Alert></section>}
+
+      {syncResult && <section className="sync-results"><Alert variant={syncResult.partiallyFailedStockCount ? "attention" : "default"}><AlertTitle><Database className="sync-results-icon" />{copy.states.syncComplete}</AlertTitle><AlertDescription><span>{interpolate(copy.sync.attempted, { count: syncResult.attemptedStockCount, complete: syncResult.fullyCompletedStockCount, failed: syncResult.partiallyFailedStockCount })}</span>{syncResult.failures.length > 0 && <span> {interpolate(copy.sync.failures, { items: syncResult.failures.map((failure) => `${failure.securityCode} ${failure.dataKind}`).join(", ") })}</span>}</AlertDescription></Alert></section>}
     </PageFrame>
   )
 }
 
 function StockDetail({ analysis, parameters, onNavigate }: { analysis: StockAnalysisResult; parameters: StockModelParameterSet | null; onNavigate: (path: string) => void }) {
+  const { locale, messages } = useLocale()
+  const copy = messages.stocks.ui
+  const decisionCopy = messages.dividendStrategy.ui.overview.decision
   const name = displayStockName(analysis)
-  return <>
-    <div className="stock-detail-header"><div><div className="d-kicker"><span>01</span><span>资料读数</span><i /></div><div className="stock-detail-identity"><div className="d-stock-avatar">{name.slice(0, 2)}</div><div><h2 className="stock-detail-name">{name}</h2><p className="stock-detail-code">{analysis.securityCode}.{analysis.exchangeCode} · {exchangeLabel(analysis.exchangeCode)} A 股 · 数据日 {formatDate(analysis.dataAsOfDate)}</p></div></div></div><Badge variant={analysis.priceZoneConfirmed ? "accent" : "attention"}>{analysis.priceZoneConfirmed ? "价格区间已确认" : "价格区间待确认"}</Badge></div>
-    <div className="stock-analysis-grid"><div className="analysis-tile"><span>最新收盘</span><strong>{formatMoney(analysis.closePrice)}</strong></div><div className="analysis-tile"><span>TTM 股息率</span><strong>{formatPercent(analysis.dividendYield)}</strong></div><div className="analysis-tile"><span>模型股息 / 股</span><strong>{formatMoney(analysis.modelDividendPerShare)}</strong></div><div className="analysis-tile"><span>持仓股数</span><strong>{analysis.heldShares.toLocaleString("zh-CN")}</strong></div><div className="analysis-tile"><span>核心股数</span><strong>{analysis.coreShares.toLocaleString("zh-CN")}</strong></div><div className="analysis-tile"><span>卫星股数</span><strong>{analysis.satelliteShares.toLocaleString("zh-CN")}</strong></div></div>
-    <section className="stock-detail-section"><div className="d-section-head"><div><div className="d-kicker"><span>02</span><span>价格阶梯</span><i /></div><h2>把价格翻译成分量。</h2><p>和总览使用同一套后端模型参数。</p></div><div className="d-current-price"><span>当前价格</span><strong>{formatMoney(analysis.closePrice)}</strong></div></div><div className="surface d-ladder-card stock-ladder-card"><PriceLadder analysis={analysis} /><PriceZoneBoard analysis={analysis} /></div></section>
-    <section className="stock-detail-section"><SectionHeading label="MODEL PARAMETERS" title="这只股票的参数" description="模型参数按股票独立保存，修改后由下一次分析读取。" />{parameters ? <div className="parameter-grid">{parameterEntries(parameters).map(([label, value]) => <div className="parameter-item" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div> : <EmptyState title="还没有模型参数" description="请先为这只股票建立参数，后端才会生成完整价格阶梯。" action={<Button variant="outline" onClick={() => onNavigate(`/settings?stock=${encodeURIComponent(`${analysis.securityCode}:${analysis.exchangeCode}`)}`)}>去配置参数</Button>} />}<div className="note-box">{analysis.explanation || "当前没有可展示的模型解释。"}</div></section>
-  </>
+  const identity = interpolate(copy.detail.dataIdentity, { code: analysis.securityCode, exchange: analysis.exchangeCode, exchangeLabel: exchangeLabel(analysis.exchangeCode), date: formatDate(analysis.dataAsOfDate) })
+
+  return (
+    <>
+      <div className="stock-detail-header">
+        <div>
+          <div className="d-kicker"><span>01</span><span>{copy.detail.readingLabel}</span><i /></div>
+          <div className="stock-detail-identity"><div className="d-stock-avatar">{name.slice(0, 2)}</div><div><h2 className="stock-detail-name">{name}</h2><p className="stock-detail-code">{identity}</p></div></div>
+        </div>
+        <Badge variant={analysis.priceZoneConfirmed ? "accent" : "attention"}>{analysis.priceZoneConfirmed ? copy.detail.confirmed : copy.detail.unconfirmed}</Badge>
+      </div>
+
+      <StockActionSummary analysis={analysis} labels={decisionCopy} />
+
+      <div className="stock-analysis-grid">
+        <AnalysisTile label={copy.detail.metrics.closePrice} value={formatMoney(analysis.closePrice)} />
+        <AnalysisTile label={copy.detail.metrics.dividendYield} value={formatPercent(analysis.dividendYield)} />
+        <AnalysisTile label={copy.detail.metrics.modelDividend} value={formatMoney(analysis.modelDividendPerShare)} />
+        <AnalysisTile label={copy.detail.metrics.heldShares} value={analysis.heldShares.toLocaleString(locale)} />
+        <AnalysisTile label={copy.detail.metrics.coreShares} value={analysis.coreShares.toLocaleString(locale)} />
+        <AnalysisTile label={copy.detail.metrics.satelliteShares} value={analysis.satelliteShares.toLocaleString(locale)} />
+      </div>
+
+      <Separator />
+      <section className="stock-detail-section">
+        <div className="d-section-head">
+          <div><div className="d-kicker"><span>02</span><span>{copy.detail.priceSectionLabel}</span><i /></div><h2>{copy.detail.priceSectionTitle}</h2><p>{copy.detail.priceSectionDescription}</p></div>
+          <div className="d-current-price"><span>{copy.detail.currentPrice}</span><strong>{formatMoney(analysis.closePrice)}</strong></div>
+        </div>
+        <Card className="stock-ladder-card"><CardContent><PriceLadder analysis={analysis} /><PriceZoneBoard analysis={analysis} /></CardContent></Card>
+      </section>
+
+      <Separator />
+      <section className="stock-detail-section">
+        <SectionHeading label={copy.detail.parametersLabel} title={copy.detail.parametersTitle} description={copy.detail.parametersDescription} />
+        {parameters ? <div className="parameter-grid">{parameterEntries(parameters, copy.detail.parameterNames).map(([label, value]) => <div className="parameter-item" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div> : <EmptyState title={copy.detail.missingParametersTitle} description={copy.detail.missingParametersDescription} action={<Button variant="outline" onClick={() => onNavigate(`/settings?stock=${encodeURIComponent(`${analysis.securityCode}:${analysis.exchangeCode}`)}`)}>{copy.actions.configure}</Button>} />}
+        <div className="note-box">{analysis.explanation || copy.states.explanationFallback}</div>
+      </section>
+    </>
+  )
+}
+
+function AnalysisTile({ label, value }: { label: string; value: string }) {
+  return <div className="analysis-tile"><span>{label}</span><strong>{value}</strong></div>
 }
 
 function StockDetailPending({ stock, message, onSync }: { stock: StockWatchlistItem; message: string | null; onSync: () => void }) {
+  const { messages } = useLocale()
+  const copy = messages.stocks.ui
   const name = displayStockName(stock)
-  return <div className="stock-detail-pending"><div className="d-kicker"><span>01</span><span>资料读数</span><i /></div><div className="stock-detail-identity"><div className="d-stock-avatar">{name.slice(0, 2)}</div><div><h2 className="stock-detail-name">{name}</h2><p className="stock-detail-code">{stock.securityCode}.{stock.exchangeCode} · 等待资料同步</p></div></div><h3>资料还在路上。</h3><p>这只股票已经保存到你的组合。基础资料、行情、股息和财务快照完成同步后，这里会自动出现价格阶梯。</p>{message && <p className="stock-pending-message">{message}</p>}<Button variant="outline" onClick={onSync}><RefreshCw data-icon="inline-start" />重新同步</Button></div>
+  const identity = interpolate(copy.detail.pendingIdentity, { code: stock.securityCode, exchange: stock.exchangeCode })
+
+  return (
+    <div className="stock-detail-pending">
+      <div className="d-kicker"><span>01</span><span>{copy.detail.readingLabel}</span><i /></div>
+      <div className="stock-detail-identity"><div className="d-stock-avatar">{name.slice(0, 2)}</div><div><h2 className="stock-detail-name">{name}</h2><p className="stock-detail-code">{identity}</p></div></div>
+      <h3>{copy.states.pendingTitle}</h3>
+      <p>{copy.states.pendingDescription}</p>
+      {message && <p className="stock-pending-message">{message}</p>}
+      <Button variant="outline" onClick={onSync}><RefreshCw data-icon="inline-start" />{copy.actions.resync}</Button>
+    </div>
+  )
 }
 
-function parameterEntries(parameters: StockModelParameterSet) {
-  return [["模型版本", parameters.modelVersion], ["强买入收益率", formatPercent(parameters.strongBuyYieldThreshold)], ["加仓收益率", formatPercent(parameters.accumulationYieldThreshold)], ["减仓候选收益率", formatPercent(parameters.partialTrimYieldThreshold)], ["激进减仓收益率", formatPercent(parameters.aggressiveTrimYieldThreshold)], ["单股最大权重", formatPercent(parameters.maxSecurityWeight)], ["行业最大权重", formatPercent(parameters.maxSectorWeight)], ["现金保留比例", formatPercent(parameters.cashReserveRatio)], ["单次交易上限", formatMoney(parameters.maxSingleTradeAmount)], ["交易单位", `${parameters.tradingLotSize} 股`], ["生效日期", formatDate(parameters.effectiveFromDate)]] as const
+function parameterEntries(parameters: StockModelParameterSet, labels: Record<string, string>) {
+  return [
+    [labels.modelVersion, parameters.modelVersion],
+    [labels.strongBuyYield, formatPercent(parameters.strongBuyYieldThreshold)],
+    [labels.accumulationYield, formatPercent(parameters.accumulationYieldThreshold)],
+    [labels.partialTrimYield, formatPercent(parameters.partialTrimYieldThreshold)],
+    [labels.aggressiveTrimYield, formatPercent(parameters.aggressiveTrimYieldThreshold)],
+    [labels.maxSecurityWeight, formatPercent(parameters.maxSecurityWeight)],
+    [labels.maxSectorWeight, formatPercent(parameters.maxSectorWeight)],
+    [labels.cashReserveRatio, formatPercent(parameters.cashReserveRatio)],
+    [labels.maxSingleTradeAmount, formatMoney(parameters.maxSingleTradeAmount)],
+    [labels.tradingLotSize, `${parameters.tradingLotSize} ${labels.tradingLotSuffix}`],
+    [labels.effectiveFromDate, formatDate(parameters.effectiveFromDate)],
+  ] as const
 }

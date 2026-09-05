@@ -40,10 +40,14 @@
       "zhCN": "中文",
       "enUS": "EN"
     },
+    "actions": {
+      "retry": "重新读取"
+    },
     "settings": "打开设置",
     "scrollToTop": "回到顶部",
     "states": {
       "readingData": "正在读取数据…",
+      "errorTitle": "数据读取失败",
       "connecting": "正在连接本地组合…",
       "preparingSetup": "正在准备首次设置…",
       "setupCompleteSync": "组合已建立，股票资料正在后台同步。",

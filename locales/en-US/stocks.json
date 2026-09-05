@@ -34,5 +34,97 @@
     "status_code": 404,
     "title": "Stock is not configured",
     "detail": "Stock {securityCode} ({exchangeCode}) is not configured in the watchlist."
+  },
+  "ui": {
+    "page": {
+      "eyebrow": "STOCK LIBRARY / SOURCE DATA",
+      "title": "Keep every stock traceable.",
+      "description": "Prices, dividends, and financial snapshots come from backend syncs. Missing data stays visible instead of being replaced with frontend defaults.",
+      "watchlistLabel": "WATCHLIST",
+      "watchlistTitle": "{count} A-shares",
+      "watchlistDescription": "Review model inputs and results for each stock."
+    },
+    "actions": {
+      "syncAll": "Sync all data",
+      "syncing": "Syncing…",
+      "resync": "Sync again",
+      "configure": "Configure parameters",
+      "goSetup": "Create a portfolio"
+    },
+    "states": {
+      "loadingList": "Reading stock data…",
+      "loadingAnalysis": "Reading this stock’s analysis…",
+      "readError": "Stock data is temporarily unavailable.",
+      "analysisError": "This stock’s analysis is temporarily unavailable.",
+      "syncError": "Data sync failed. Please try again later.",
+      "emptyTitle": "No stock data yet",
+      "emptyDescription": "After first-time setup, this page shows each stock’s data, holdings, and model parameters.",
+      "dataWarningTitle": "Read notice",
+      "syncComplete": "Data sync complete",
+      "pendingTitle": "The data is still on its way.",
+      "pendingDescription": "This stock is already in your portfolio. The price ladder will appear after its profile, quotes, dividends, and financial snapshots finish syncing.",
+      "pendingMessage": "Background sync is still running, so the full analysis is not ready yet.",
+      "explanationFallback": "There is no model explanation to show yet."
+    },
+    "selector": {
+      "kicker": "My stocks",
+      "title": "Which one should we check first?",
+      "description": "{count} watchlist items · configured separately",
+      "selectionHint": "Select one to see its details",
+      "listLabel": "Stock list",
+      "pending": "Waiting for data",
+      "sectorUnset": "Sector not set",
+      "signals": {
+        "strongBuy": "Test-buy range",
+        "accumulate": "Add in steps",
+        "partialTrim": "Trim candidate",
+        "aggressiveTrim": "Consider trimming",
+        "reEvaluate": "Review needed",
+        "hold": "No action",
+        "unknown": "Waiting for data"
+      }
+    },
+    "detail": {
+      "readingLabel": "DATA READOUT",
+      "dataIdentity": "{code}.{exchange} · {exchangeLabel} A-share · data date {date}",
+      "pendingIdentity": "{code}.{exchange} · waiting for sync",
+      "confirmed": "Price zones confirmed",
+      "unconfirmed": "Price zones need confirmation",
+      "metrics": {
+        "closePrice": "Latest close",
+        "dividendYield": "TTM dividend yield",
+        "modelDividend": "Model dividend / share",
+        "heldShares": "Held shares",
+        "coreShares": "Core shares",
+        "satelliteShares": "Satellite shares"
+      },
+      "priceSectionLabel": "PRICE LADDER",
+      "priceSectionTitle": "Turn prices into position sizes.",
+      "priceSectionDescription": "Uses the same backend model parameters as Today’s decision.",
+      "currentPrice": "Current price",
+      "parametersLabel": "MODEL PARAMETERS",
+      "parametersTitle": "Parameters for this stock",
+      "parametersDescription": "Parameters are saved per stock and used by the next analysis run.",
+      "missingParametersTitle": "No model parameters yet",
+      "missingParametersDescription": "Set parameters for this stock before the backend can generate a complete price ladder.",
+      "parameterNames": {
+        "modelVersion": "Model version",
+        "strongBuyYield": "Strong-buy yield",
+        "accumulationYield": "Accumulation yield",
+        "partialTrimYield": "Partial-trim yield",
+        "aggressiveTrimYield": "Aggressive-trim yield",
+        "maxSecurityWeight": "Max stock weight",
+        "maxSectorWeight": "Max sector weight",
+        "cashReserveRatio": "Cash reserve ratio",
+        "maxSingleTradeAmount": "Max single trade",
+        "tradingLotSize": "Trading lot",
+        "tradingLotSuffix": "shares",
+        "effectiveFromDate": "Effective from"
+      }
+    },
+    "sync": {
+      "attempted": "Tried {count}; completed {complete}; partially failed {failed}.",
+      "failures": "Failed items: {items}."
+    }
   }
 }

@@ -12,16 +12,17 @@ type PageFrameProps = {
   onNavigate: (path: string) => void
   lastUpdated?: string | null
   dataState?: "synced" | "pending" | "unknown"
+  contentClassName?: string
 }
 
-export function PageFrame({ children, currentPath, onNavigate, lastUpdated, dataState = "unknown" }: PageFrameProps) {
+export function PageFrame({ children, currentPath, onNavigate, lastUpdated, dataState = "unknown", contentClassName }: PageFrameProps) {
   const { messages } = useLocale()
   const pageLabel = findSiteNavigationItem(currentPath)
 
   return (
     <div className={cn("app-frame", currentPath === "/overview" && "app-frame-overview")}>
       <SiteHeader currentPath={currentPath} onNavigate={onNavigate} />
-      <main className="page-wrap">
+      <main className={cn("page-wrap", contentClassName)}>
         {currentPath !== "/overview" && <div className="page-crumb"><span>{messages.common.ui.appName}</span><ChevronRight size={13} /><span className="page-crumb-current">{pageLabel ? messages.common.ui.nav[pageLabel.key] : messages.common.ui.nav.settings}</span></div>}
         {children}
       </main>
